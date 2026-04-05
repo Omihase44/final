@@ -39,19 +39,47 @@ except ImportError:  # pragma: no cover - startup fallback until dependency is i
         def run(self, app, *args, **kwargs):
             return app.run(*args, **kwargs)
 
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+
+def _resolve_runtime_path(env_key, default_name):
+    configured_value = os.environ.get(env_key)
+    if configured_value:
+        return configured_value if os.path.isabs(configured_value) else os.path.join(BASE_DIR, configured_value)
+    return os.path.join(BASE_DIR, default_name)
+
+
+def _ensure_parent_dir(path):
+    parent_dir = os.path.dirname(path)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+
+
+def _ensure_json_file(path, default_value):
+    _ensure_parent_dir(path)
+    if not os.path.exists(path):
+        with open(path, 'w', encoding='utf-8') as file_handle:
+            json.dump(default_value, file_handle, indent=2)
+
+
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this-in-production'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-secret-key')
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = _resolve_runtime_path("UPLOAD_FOLDER", "uploads")
 CHAT_MEDIA_FOLDER = os.path.join(UPLOAD_FOLDER, "chat_media")
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'dcm', 'dicom'}
-USERS_FILE = "users.json"
-REPORTS_FILE = "reports.json"
-PATIENT_DETAILS_FILE = "patient_details.json"
-CHAT_DB_PATH = "chat_store.sqlite3"
-APPOINTMENT_DB_PATH = "appointment_store.sqlite3"
+USERS_FILE = _resolve_runtime_path("USERS_FILE", "users.json")
+REPORTS_FILE = _resolve_runtime_path("REPORTS_FILE", "reports.json")
+PATIENT_DETAILS_FILE = _resolve_runtime_path("PATIENT_DETAILS_FILE", "patient_details.json")
+CHAT_DB_PATH = _resolve_runtime_path("CHAT_DB_PATH", "chat_store.sqlite3")
+APPOINTMENT_DB_PATH = _resolve_runtime_path("APPOINTMENT_DB_PATH", "appointment_store.sqlite3")
+DATA_SEED_FILES = (
+    (USERS_FILE, {"doctors": [], "patients": []}),
+    (REPORTS_FILE, []),
+    (PATIENT_DETAILS_FILE, {}),
+)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
@@ -60,6 +88,8 @@ app.config['APPOINTMENT_DB_PATH'] = APPOINTMENT_DB_PATH
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(CHAT_MEDIA_FOLDER, exist_ok=True)
+for seed_path, default_value in DATA_SEED_FILES:
+    _ensure_json_file(seed_path, default_value)
 
 # Global variables for models
 brain_model = None
@@ -361,7 +391,7 @@ def login_required(user_type=None):
 def load_brain_model():
     global brain_model
     if brain_model is None:
-        brain_model = safe_load_keras_model('brain_model_new.h5')
+        brain_model = safe_load_keras_model(os.path.join(BASE_DIR, 'brain_model_new.h5'))
         if brain_model is None:
             print("Brain model not found. Using fallback mode.")
     return brain_model
@@ -369,7 +399,7 @@ def load_brain_model():
 def load_alz_model():
     global alz_model
     if alz_model is None:
-        alz_model = safe_load_keras_model('alz_model_new.h5')
+        alz_model = safe_load_keras_model(os.path.join(BASE_DIR, 'alz_model_new.h5'))
         if alz_model is None:
             print("Alzheimer model not found. Using fallback mode.")
     return alz_model
@@ -526,6 +556,10 @@ register_appointment_socketio(socketio, app.config['APPOINTMENT_DB_PATH'])
 @app.route('/')
 def home():
     return render_template('landing.html')
+
+@app.route('/healthz')
+def healthcheck():
+    return jsonify({'status': 'ok'}), 200
 
 @app.route('/patient')
 def patient_portal():
@@ -1078,4 +1112,6 @@ def handle_error(e):
     }), 500
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, use_reloader=False, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', '5000'))
+    debug_mode = os.environ.get('FLASK_DEBUG', '').lower() in {'1', 'true', 'yes'}
+    socketio.run(app, debug=debug_mode, use_reloader=False, host='0.0.0.0', port=port)

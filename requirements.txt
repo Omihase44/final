@@ -1,11 +1,13 @@
 Flask==2.2.5
 Flask-CORS
 Flask-SocketIO
+gunicorn
 numpy<1.24
-opencv-python
+opencv-python-headless
 pillow
 pydicom
 scikit-learn
+simple-websocket
 reportlab
 tensorflow==2.11.0
-Werkzeug<3
+Werkzeug==2.2.3
