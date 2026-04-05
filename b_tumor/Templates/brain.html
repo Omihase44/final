@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- Registration start   -->
+<div style="background: url('/media/bg.jpg'); background-repeat:no-repeat;background-size:cover; color: white; height: 850px;padding: 100px 0 0 0;  ">
+   <!-- Registration start   -->
+
+    <div class="container" style="width: 80%;position: absolute;
+  left: auto;">
+        <div class="row justify-content-left"> <!-- Center the container horizontally -->
+            <div class="col-md-8"> <!-- Reduce the width of the container -->
+                <div class="col-md-12" style="background-color: rgba(128, 128, 128, 0.2); /* Grey with 50% opacity */
+margin-top: 9%;">
+                    <h3 class="card-title text-center" style="color:white">PATIENTS DETAILS</h3>
+                    <hr style=" border-top:  2px solid white">
+
+                    <form class="form-horizontal" action='/brain/' enctype="multipart/form-data" method="POST" id="form1">
+                        {% csrf_token %}
+
+                        <div class="form-row">
+                            <div class="col-md-6 mb-3"> <!-- Reduce the width of the columns -->
+                                <label for="name" style="color: white;font-weight: bold;">NAME</label>
+                                <input type="text" name="name" id="name" placeholder="Name" class="form-control">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label style="color: white" for="age">AGE</label>
+                                <input type="number" class="form-control" name="age" id="age" placeholder="Age" value="">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="col-md-6 mb-3">
+                                <label for="contact" style="color: white;font-weight: bold;">CONTACT</label>
+                                <input type="text" name="contact" id="contact" placeholder="Contact" class="form-control">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label style="color: white" for="email">EMAIL</label>
+                                <input type="email" class="form-control" name="email" id="email" placeholder="Email" value="">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="col-md-12 mb-3">
+                                <label for="Username" style="color: white;font-weight: bold;">USERNAME</label>
+                                <input type="text" name="Username" id="Username" placeholder="Username" class="form-control">
+                            </div>
+                        </div>
+
+                       <div class="form-row">
+    <div class="col-md-12 mb-3">
+        <label for="Image1" style="color: white;font-weight: bold;">Scanned Image photo</label>
+        <input type="file" name="Image1" id="Image1" class="form-control" onchange="previewImage(this)">
+        <img id="imagePreview" src="#" alt="Image Preview" style="display: none; max-width: 200px; height: 200px;">
+    </div>
+</div>
+                        <div class="col-md-12 text-center" style="margin-top: 5px">
+                            <input type="button" class="btn btn-success" value="GO" onclick="check()">
+                            <br>
+                            <hr style="border-top: 2px solid white">
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Display data if available -->
+                {% if context %}
+                <div class="container">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h3 class="text-center" style="color:black;">Diagnosis Results</h3>
+                            <hr>
+                            <p class="text-center" style="color:black;"><strong>Predicted Tumor Type:</strong> {{ context.predicted_class }}</p>
+                            <p class="text-center" style="color:black;"><strong>Symptoms:</strong> {{ context.symptoms }}</p>
+                            <p class="text-center" style="color:black;"><strong>Treatment:</strong> {{ context.treatment }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+
+
+<!-- Registration end   -->
+<script>
+    function previewImage(input) {
+        var preview = document.getElementById('imagePreview');
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                preview.src = e.target.result;
+                preview.style.display = 'block'; // Show the image preview
+            }
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            preview.style.display = 'none'; // Hide the image preview if no file selected
+        }
+    }
+</script>
+
+<script type="text/javascript">
+    function check() {
+        if (document.getElementById('name').value != "") {
+            if (document.getElementById('age').value != "") {
+                if (document.getElementById('contact').value != "") {
+                    if (document.getElementById('email').value != "") {
+                        if (document.getElementById('Username').value != "") {
+                            if (document.getElementById('Image1').value != "") {
+                                document.getElementById('form1').submit()
+                                return true;
+                            } else {
+                                alert('Enter Image1');
+                                return false;
+                            }
+                        } else {
+                            alert('Enter Username');
+                            return false;
+                        }
+                    } else {
+                        alert('Enter Email');
+                        return false;
+                    }
+                } else {
+                    alert('Enter Contact');
+                    return false;
+                }
+            } else {
+                alert('Enter Age');
+                return false;
+            }
+        } else {
+            alert('Enter Name');
+            return false;
+        }
+    }
+</script>
+
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container">
+    {% if messages %}
+    {% for message in messages %}
+    {% if message.tags %} <script>alert("{{ message }}")</script> {% endif %}
+    {% endfor %}
+    {% endif %}
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-image: url('/media/user.jpg');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+
+        h2 {
+            text-align: center;
+            margin-top: 20px;
+            color: #333;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            /* Optional: Add a semi-transparent white background to the table */
+            overflow-x: auto;
+            overflow-y: auto;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        img {
+            display: block;
+            max-width: 100px;
+            max-height: 100px;
+            margin: 0 auto;
+        }
+    </style>
+</div>
+
+<h2>User Details</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Age</th>
+            <th>Contact</th>
+            <th>Email</th>
+            <th>Username</th>
+            <th>Image</th>
+            <th>Class Detected</th>
+            <th>Symptoms</th>
+            <th>Treatment</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in sty %}
+        <tr>
+            <td>{{ user.Name }}</td>
+            <td>{{ user.Age }}</td>
+            <td>{{ user.Contact }}</td>
+            <td>{{ user.Email }}</td>
+            <td>{{ user.Username }}</td>
+            <td><img src="{{ user.Image1.url }}" alt="User Image"></td>
+            <td>{{ user.Class_detected }}</td>
+            <td>{{ user.Symptoms }}</td>
+            <td>{{ user.Treatment }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

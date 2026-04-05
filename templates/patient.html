@@ -1,0 +1,2084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Portal - NeuroDetect AI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --bg-dark: #0f0f1a;
+            --bg-darker: #0a0a12;
+            --card-dark: #1a1a2e;
+            --text-light: #ffffff;
+            --text-muted: #a0a0a0;
+            --border-dark: #2a2a3a;
+            --success: #00d68f;
+            --warning: #ffaa00;
+            --danger: #ff3d71;
+            --info: #0095ff;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        /* 3D Animated Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        /* Floating Particles */
+        .particle {
+            position: fixed;
+            background: rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 20s infinite linear;
+            z-index: -1;
+        }
+        
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.5;
+            }
+            90% {
+                opacity: 0.5;
+            }
+            100% {
+                transform: translateY(-100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        /* Glassmorphism Navbar */
+        .navbar {
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(102, 126, 234, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            transition: transform 0.3s ease;
+        }
+        
+        .navbar-brand:hover {
+            transform: scale(1.05);
+        }
+        
+        /* 3D Cards */
+        .card {
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        
+        .card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+        
+        .card-title {
+            color: var(--text-light);
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
+        }
+        
+        /* Upload Area with 3D Effect */
+        .upload-area {
+            border: 2px dashed rgba(102, 126, 234, 0.5);
+            border-radius: 20px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(15, 15, 26, 0.6);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transform: rotate(45deg);
+            transition: transform 0.6s ease;
+        }
+        
+        .upload-area:hover::before {
+            transform: rotate(45deg) translate(50%, 50%);
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            transform: scale(1.02);
+            box-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
+        }
+        
+        /* 3D Buttons */
+        .btn-primary {
+            background: var(--primary-gradient);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn-primary:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* Report Cards with 3D Hover */
+        .report-card {
+            background: linear-gradient(135deg, rgba(26, 26, 46, 0.95), rgba(15, 15, 26, 0.95));
+            border-left: 4px solid;
+            border-radius: 15px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .report-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .report-card:hover::before {
+            left: 100%;
+        }
+        
+        .report-card:hover {
+            transform: translateX(10px) scale(1.02);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .report-card.pending {
+            border-left-color: #ffaa00;
+        }
+        
+        .report-card.reviewed {
+            border-left-color: #0095ff;
+        }
+        
+        .report-card.sent, .report-card.approved {
+            border-left-color: #00d68f;
+        }
+        
+        .report-card.rejected {
+            border-left-color: #ff3d71;
+        }
+        
+        /* Status Badges */
+        .status-badge {
+            display: inline-block;
+            padding: 0.35rem 1rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+        
+        .status-pending {
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
+            border: 1px solid #ffaa00;
+        }
+        
+        .status-reviewed {
+            background: rgba(0, 149, 255, 0.2);
+            color: #0095ff;
+            border: 1px solid #0095ff;
+        }
+        
+        .status-sent, .status-approved {
+            background: rgba(0, 214, 143, 0.2);
+            color: #00d68f;
+            border: 1px solid #00d68f;
+        }
+        
+        .status-rejected {
+            background: rgba(255, 61, 113, 0.2);
+            color: #ff3d71;
+            border: 1px solid #ff3d71;
+        }
+        
+        /* Form Controls */
+        .form-control, .form-select {
+            background: rgba(15, 15, 26, 0.8);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: var(--text-light);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background: rgba(15, 15, 26, 0.9);
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+            color: var(--text-light);
+        }
+        
+        .form-control::placeholder {
+            color: rgba(160, 160, 160, 0.6);
+        }
+        
+        .form-label {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+        }
+        
+        /* Modal with Glass Effect */
+        .modal-content {
+            background: rgba(26, 26, 46, 0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 20px;
+            color: var(--text-light);
+        }
+        
+        .modal-header {
+            border-bottom-color: rgba(102, 126, 234, 0.3);
+        }
+        
+        .modal-footer {
+            border-top-color: rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-close {
+            filter: invert(1);
+        }
+        
+        /* Info Cards */
+        .info-card {
+            background: rgba(15, 15, 26, 0.6);
+            padding: 1rem;
+            border-radius: 15px;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .info-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(102, 126, 234, 0.5);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+        
+        /* Alert Messages */
+        .alert {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 9999;
+            min-width: 300px;
+            animation: slideInRight 0.3s ease;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        /* Tabs Styling */
+        .nav-tabs {
+            border-bottom-color: rgba(102, 126, 234, 0.3);
+        }
+        
+        .nav-tabs .nav-link {
+            color: var(--text-muted);
+            border: none;
+            padding: 10px 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-tabs .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: var(--primary-gradient);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+        
+        .nav-tabs .nav-link:hover::after,
+        .nav-tabs .nav-link.active::after {
+            width: 80%;
+        }
+        
+        .nav-tabs .nav-link.active {
+            color: #667eea;
+            background: transparent;
+        }
+        
+        /* Loader */
+        .loader {
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #00ffcc, #00cc99);
+            color: #000;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 6px 18px rgba(0, 255, 200, 0.2);
+        }
+
+        .glass-chat {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 320px;
+            height: 400px;
+            backdrop-filter: blur(15px);
+            background: rgba(20, 20, 30, 0.6);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 200, 0.2);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 9999;
+        }
+
+        .chat-header {
+            padding: 12px 14px;
+            font-weight: bold;
+            color: #00ffcc;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .chat-messages p {
+            background: rgba(0, 255, 200, 0.1);
+            padding: 8px 10px;
+            border-radius: 8px;
+            margin: 6px 0;
+            color: var(--text-light);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .chat-messages p.self-message {
+            background: rgba(0, 255, 200, 0.16);
+        }
+
+        .chat-messages p.peer-message {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .chat-input-area {
+            display: flex;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(10, 10, 18, 0.5);
+        }
+
+        .chat-input-area input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: white;
+            padding: 10px 12px;
+            outline: none;
+        }
+
+        .chat-input-area input::placeholder {
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        .chat-input-area button {
+            background: #00ffcc;
+            border: none;
+            padding: 8px 14px;
+            cursor: pointer;
+            color: #00110d;
+            font-weight: bold;
+        }
+
+        .glass-card {
+            position: fixed;
+            bottom: 440px;
+            right: 20px;
+            width: 300px;
+            padding: 15px;
+            backdrop-filter: blur(15px);
+            background: rgba(20, 20, 30, 0.6);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 200, 0.2);
+            display: none;
+            z-index: 9999;
+        }
+
+        .glass-card h4 {
+            color: #00ffcc;
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        .glass-card input {
+            width: 100%;
+            margin: 5px 0;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            color: white;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        .glass-card button {
+            width: 100%;
+            margin-top: 8px;
+            padding: 8px;
+            background: linear-gradient(135deg, #00ffcc, #00cc99);
+            border: none;
+            color: black;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .report-card {
+                padding: 0.8rem;
+            }
+            
+            .upload-area {
+                padding: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Floating Particles -->
+    <div id="particles"></div>
+    
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="fas fa-brain me-2"></i>NeuroDetect AI
+            </a>
+            <div class="ms-auto">
+                <button class="btn btn-outline-light me-2" id="themeToggle" onclick="toggleTheme()">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="btn btn-danger" id="logoutBtn" style="display: none;" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-content" style="padding: 2rem; min-height: calc(100vh - 70px);">
+        <div class="container">
+            <!-- Auth Section -->
+            <div id="authSection" class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body p-4">
+                            <ul class="nav nav-tabs mb-4" id="authTab" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login" type="button" role="tab">Login</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#register" type="button" role="tab">Register</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content">
+                                <div class="tab-pane fade show active" id="login" role="tabpanel">
+                                    <form id="loginForm">
+                                        <div class="mb-3">
+                                            <label class="form-label">Username</label>
+                                            <input type="text" class="form-control" id="loginUsername" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Password</label>
+                                            <input type="password" class="form-control" id="loginPassword" required>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary w-100">Login</button>
+                                    </form>
+                                </div>
+                                <div class="tab-pane fade" id="register" role="tabpanel">
+                                    <form id="registerForm">
+                                        <div class="mb-3">
+                                            <label class="form-label">Full Name *</label>
+                                            <input type="text" class="form-control" id="regFullname" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Username *</label>
+                                            <input type="text" class="form-control" id="regUsername" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Email *</label>
+                                            <input type="email" class="form-control" id="regEmail" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Password *</label>
+                                            <input type="password" class="form-control" id="regPassword" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Age</label>
+                                            <input type="number" class="form-control" id="regAge">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Gender</label>
+                                            <select class="form-select" id="regGender">
+                                                <option value="">Select</option>
+                                                <option value="Male">Male</option>
+                                                <option value="Female">Female</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Phone</label>
+                                            <input type="tel" class="form-control" id="regPhone">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Address</label>
+                                            <textarea class="form-control" id="regAddress" rows="2"></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Medical History</label>
+                                            <textarea class="form-control" id="regHistory" rows="3"></textarea>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary w-100">Register</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Section -->
+            <div id="dashboardSection" style="display: none;">
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h4 class="card-title">Welcome back, <span id="userName" style="color: #667eea;"></span>!</h4>
+                                <p class="text-muted">Your AI-powered health companion is ready to assist you</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <ul class="nav nav-tabs mb-4" id="dashboardTab" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">
+                            <i class="fas fa-upload me-2"></i>Upload Scan
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports" type="button" role="tab">
+                            <i class="fas fa-file-alt me-2"></i>My Reports
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button" role="tab">
+                            <i class="fas fa-user me-2"></i>Profile
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab">
+                            <i class="fas fa-comments me-2"></i>Chat
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="appointments-tab" data-bs-toggle="tab" data-bs-target="#appointments" type="button" role="tab">
+                            <i class="fas fa-calendar-check me-2"></i>Appointments
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Upload Tab -->
+                    <div class="tab-pane fade show active" id="upload" role="tabpanel">
+                        <div class="card">
+                            <div class="card-body p-4">
+                                <h5 class="card-title">Upload Medical Scan</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">Detection Type</label>
+                                    <select class="form-select" id="detectionType">
+                                        <option value="brain">🧠 Brain Tumor Detection</option>
+                                        <option value="alz">🔬 Alzheimer's Detection</option>
+                                    </select>
+                                </div>
+                                <div class="upload-area" onclick="document.getElementById('scanFile').click()">
+                                    <i class="fas fa-cloud-upload-alt fa-3x mb-3" style="color: #667eea;"></i>
+                                    <p class="mb-2">Click to upload MRI or brain scan image</p>
+                                    <small class="text-muted">Supported: JPG, PNG, JPEG, GIF, BMP (Max 16MB)</small>
+                                    <input type="file" id="scanFile" style="display: none;" accept="image/*">
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Patient Name</label>
+                                        <input type="text" class="form-control" id="patientName" placeholder="Your full name">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Age</label>
+                                        <input type="number" class="form-control" id="patientAge" placeholder="Age">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Gender</label>
+                                        <select class="form-select" id="patientGender">
+                                            <option value="">Select</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Current Symptoms</label>
+                                    <textarea class="form-control" id="symptoms" rows="3" placeholder="Describe any symptoms you're experiencing..."></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Additional Notes</label>
+                                    <textarea class="form-control" id="notes" rows="3" placeholder="Any additional information for the doctor..."></textarea>
+                                </div>
+                                <button class="btn btn-primary w-100" onclick="uploadScan()">
+                                    <i class="fas fa-microscope me-2"></i>Analyze Scan
+                                </button>
+                                <div id="uploadLoader" class="loader"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reports Tab -->
+                    <div class="tab-pane fade" id="reports" role="tabpanel">
+                        <div class="card">
+                            <div class="card-body p-4">
+                                <h5 class="card-title">My Health Reports</h5>
+                                <div id="reportsList"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Profile Tab -->
+                    <div class="tab-pane fade" id="profile" role="tabpanel">
+                        <div class="card">
+                            <div class="card-body p-4">
+                                <h5 class="card-title">Profile Information</h5>
+                                <div id="profileInfo"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Tab -->
+                    <div class="tab-pane fade" id="chat" role="tabpanel">
+                        <div class="card">
+                            <div class="card-body p-4">
+                                <h5 class="card-title">Doctor Chat</h5>
+                                <div class="row">
+                                    <div class="col-lg-4">
+                                        <div class="info-card">
+                                            <h6><i class="fas fa-user-md me-2"></i>Conversation</h6>
+                                            <div id="chatPartnerSummary" class="text-muted">Loading assigned doctor...</div>
+                                        </div>
+                                        <div class="info-card">
+                                            <label class="form-label">Share Media</label>
+                                            <input type="file" class="form-control" id="chatMediaInput" accept="image/*,video/*,audio/*">
+                                            <small class="text-muted d-block mt-2">Supported: image, video, and audio</small>
+                                            <div id="chatUploadStatus" class="text-muted mt-2"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-8">
+                                        <div id="chatMessages" class="mb-3"></div>
+                                        <div class="info-card">
+                                            <label class="form-label">Message</label>
+                                            <textarea class="form-control" id="chatMessageInput" rows="3" placeholder="Type your message..."></textarea>
+                                            <div class="d-flex gap-2 mt-3">
+                                                <button class="btn btn-primary" onclick="sendMsg()">
+                                                    <i class="fas fa-paper-plane me-2"></i>Send
+                                                </button>
+                                                <button class="btn btn-secondary" type="button" onclick="clearChatMediaSelection()">
+                                                    <i class="fas fa-times me-2"></i>Clear Media
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Appointments Tab -->
+                    <div class="tab-pane fade" id="appointments" role="tabpanel">
+                        <div class="card">
+                            <div class="card-body p-4">
+                                <h5 class="card-title">Appointments</h5>
+                                <div class="row g-4">
+                                    <div class="col-lg-7">
+                                        <div class="info-card">
+                                            <h6><i class="fas fa-calendar-plus me-2"></i>Book Appointment</h6>
+                                            <div class="d-flex flex-wrap gap-2 mb-3" id="appointmentStepStatus"></div>
+                                            <div id="appointmentWizard">
+                                                <div class="text-muted">Loading appointment options...</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-5">
+                                        <div class="info-card">
+                                            <h6><i class="fas fa-list me-2"></i>My Scheduled Appointments</h6>
+                                            <p class="mb-0 text-muted">Your appointments update here automatically in real time.</p>
+                                        </div>
+                                        <div id="appointmentsList"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div class="modal fade" id="reportModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Medical Report Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="reportModalContent"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        let currentUser = null;
+        let currentPatientDetails = null;
+        let chatPartnerId = null;
+        let socket = null;
+        let appointmentCatalog = {specialties: [], doctors: []};
+        let appointmentAvailability = [];
+        let appointmentForm = {
+            step: 1,
+            specialtyId: null,
+            doctorId: null,
+            date: '',
+            time: '',
+            fullName: '',
+            phone: '',
+            age: '',
+            reason: '',
+            confirmation: null
+        };
+        
+        // Create floating particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                const size = Math.random() * 5 + 2;
+                particle.style.width = size + 'px';
+                particle.style.height = size + 'px';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDuration = Math.random() * 20 + 10 + 's';
+                particle.style.animationDelay = Math.random() * 10 + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+        
+        createParticles();
+        
+        // Theme toggle
+        let isDark = true;
+        function toggleTheme() {
+            isDark = !isDark;
+            const root = document.documentElement;
+            if (isDark) {
+                root.style.setProperty('--bg-dark', '#0f0f1a');
+                root.style.setProperty('--bg-darker', '#0a0a12');
+                root.style.setProperty('--card-dark', '#1a1a2e');
+                document.getElementById('themeToggle').innerHTML = '<i class="fas fa-moon"></i>';
+            } else {
+                root.style.setProperty('--bg-dark', '#f5f5f5');
+                root.style.setProperty('--bg-darker', '#ffffff');
+                root.style.setProperty('--card-dark', '#ffffff');
+                document.getElementById('themeToggle').innerHTML = '<i class="fas fa-sun"></i>';
+            }
+        }
+        
+        // Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                username: document.getElementById('loginUsername').value,
+                password: document.getElementById('loginPassword').value
+            };
+            
+            try {
+                const response = await fetch('/api/patient/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    currentUser = result;
+                    document.getElementById('authSection').style.display = 'none';
+                    document.getElementById('dashboardSection').style.display = 'block';
+                    document.getElementById('logoutBtn').style.display = 'block';
+                    document.getElementById('userName').textContent = result.full_name;
+                    
+                    // Load patient details to get age and gender
+                    await loadPatientDetails();
+                    
+                    // Pre-fill patient info
+                    if (currentPatientDetails) {
+                        document.getElementById('patientName').value = currentPatientDetails.full_name || '';
+                        document.getElementById('patientAge').value = currentPatientDetails.age || '';
+                        document.getElementById('patientGender').value = currentPatientDetails.gender || '';
+                    }
+                    
+                    loadReports();
+                    loadProfile();
+                    initChatbox();
+                    showAlert('Welcome back! Your health companion is ready.', 'success');
+                } else {
+                    showAlert(result.error, 'danger');
+                }
+            } catch (error) {
+                showAlert('Login failed', 'danger');
+            }
+        });
+        
+        // Load patient details from registration
+        async function loadPatientDetails() {
+            try {
+                const response = await fetch('/api/patient/reports');
+                const data = await response.json();
+                if (data.reports && data.reports.length > 0) {
+                    const lastReport = data.reports[0];
+                    currentPatientDetails = {
+                        full_name: currentUser.full_name,
+                        age: lastReport.patient_age,
+                        gender: lastReport.patient_gender
+                    };
+                }
+            } catch (error) {
+                console.error('Failed to load patient details:', error);
+            }
+        }
+        
+        // Register
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                full_name: document.getElementById('regFullname').value,
+                username: document.getElementById('regUsername').value,
+                email: document.getElementById('regEmail').value,
+                password: document.getElementById('regPassword').value,
+                age: document.getElementById('regAge').value,
+                gender: document.getElementById('regGender').value,
+                phone: document.getElementById('regPhone').value,
+                address: document.getElementById('regAddress').value,
+                medical_history: document.getElementById('regHistory').value
+            };
+            
+            try {
+                const response = await fetch('/api/patient/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert('Registration successful! Please login.', 'success');
+                    document.querySelector('#login-tab').click();
+                    // Clear form
+                    document.getElementById('regFullname').value = '';
+                    document.getElementById('regUsername').value = '';
+                    document.getElementById('regEmail').value = '';
+                    document.getElementById('regPassword').value = '';
+                } else {
+                    showAlert(result.error, 'danger');
+                }
+            } catch (error) {
+                showAlert('Registration failed', 'danger');
+            }
+        });
+        
+        async function uploadScan() {
+            const file = document.getElementById('scanFile').files[0];
+            if (!file) {
+                showAlert('Please select an image file', 'danger');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('type', document.getElementById('detectionType').value);
+            formData.append('symptoms', document.getElementById('symptoms').value);
+            formData.append('notes', document.getElementById('notes').value);
+            formData.append('patient_name', document.getElementById('patientName').value);
+            formData.append('patient_age', document.getElementById('patientAge').value);
+            formData.append('patient_gender', document.getElementById('patientGender').value);
+            
+            const loader = document.getElementById('uploadLoader');
+            const btn = event.target;
+            loader.style.display = 'block';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/patient/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert('Analysis complete! Your report has been sent to the doctor.', 'success');
+                    loadReports();
+                    document.getElementById('scanFile').value = '';
+                    document.getElementById('symptoms').value = '';
+                    document.getElementById('notes').value = '';
+                } else {
+                    showAlert(result.error, 'danger');
+                }
+            } catch (error) {
+                showAlert('Upload failed: ' + error.message, 'danger');
+            } finally {
+                loader.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+        
+        async function loadReports() {
+            try {
+                const response = await fetch('/api/patient/reports');
+                const data = await response.json();
+                const container = document.getElementById('reportsList');
+                if (data.reports && data.reports.length > 0) {
+                    container.innerHTML = data.reports.map(report => `
+                        <div class="report-card ${report.status}" onclick="viewReport(${report.id})">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong><i class="fas fa-file-medical me-2"></i>${report.type === 'brain' ? 'Brain Tumor' : "Alzheimer's"} Analysis</strong><br>
+                                    <small class="text-muted">Result: ${report.result}</small><br>
+                                    <small class="text-muted">Date: ${new Date(report.date).toLocaleString()}</small>
+                                    ${report.patient_age ? `<br><small class="text-muted">Age: ${report.patient_age} | Gender: ${report.patient_gender || 'N/A'}</small>` : ''}
+                                </div>
+                                <span class="status-badge status-${report.status}">${getStatusText(report.status)}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div class="text-center text-muted py-5"><i class="fas fa-folder-open fa-3x mb-3"></i><p>No reports found. Upload your first scan!</p></div>';
+                }
+            } catch (error) {
+                console.error('Failed to load reports:', error);
+            }
+        }
+        
+        function getStatusText(status) {
+            const statusMap = {
+                'pending': '⏳ Pending Review',
+                'reviewed': '📝 Draft',
+                'approved': '✅ Approved',
+                'rejected': '❌ Rejected',
+                'sent': '📨 Sent'
+            };
+            return statusMap[status] || status;
+        }
+        
+        async function viewReport(reportId) {
+            try {
+                const response = await fetch(`/api/patient/report/${reportId}`);
+                const data = await response.json();
+                const report = data.report;
+                
+                const modal = new bootstrap.Modal(document.getElementById('reportModal'));
+                const content = document.getElementById('reportModalContent');
+                
+                content.innerHTML = `
+                    <div class="info-card">
+                        <h6><i class="fas fa-robot me-2"></i>AI Analysis Results</h6>
+                        <p><strong>Detection Type:</strong> ${report.type === 'brain' ? 'Brain Tumor' : "Alzheimer's"}</p>
+                        <p><strong>Result:</strong> ${report.result}</p>
+                        <p><strong>Tumor Confidence:</strong> ${renderConfidenceBadge(report.analysis?.tumor?.confidence ?? report.tumor_confidence)}</p>
+                        <p><strong>Alzheimer Confidence:</strong> ${renderConfidenceBadge(report.analysis?.alzheimers?.confidence ?? report.alzheimer_confidence)}</p>
+                        <p><strong>Date:</strong> ${new Date(report.date).toLocaleString()}</p>
+                        ${report.patient_age ? `<p><strong>Age:</strong> ${report.patient_age}</p>` : ''}
+                        ${report.patient_gender ? `<p><strong>Gender:</strong> ${report.patient_gender}</p>` : ''}
+                    </div>
+                    
+                    <div class="info-card">
+                        <h6><i class="fas fa-info-circle me-2"></i>Detailed Information</h6>
+                        <p><strong>Description:</strong> ${report.detailed_info.description}</p>
+                        <p><strong>Symptoms:</strong> ${report.detailed_info.symptoms}</p>
+                        <p><strong>Treatment:</strong> ${report.detailed_info.treatment}</p>
+                        <p><strong>Severity:</strong> ${report.detailed_info.severity}</p>
+                        <p><strong>Urgency:</strong> ${report.detailed_info.urgency}</p>
+                    </div>
+                    
+                    ${report.doctor_notes ? `
+                    <div class="info-card">
+                        <h6><i class="fas fa-user-md me-2"></i>Doctor's Review</h6>
+                        <p><strong>Notes:</strong> ${report.doctor_notes}</p>
+                        ${report.prescription ? `<p><strong>Prescription:</strong> ${report.prescription}</p>` : ''}
+                        ${report.follow_up ? `<p><strong>Follow-up:</strong> ${report.follow_up}</p>` : ''}
+                    </div>
+                    ` : '<div class="info-card"><p class="text-muted"><i class="fas fa-hourglass-half me-2"></i>Waiting for doctor to review your report.</p></div>'}
+                    
+                    <div class="d-flex justify-content-between mt-3">
+                        ${report.status === 'sent' || report.status === 'approved' ? `
+                        <a href="/api/patient/report/${reportId}/download" class="btn btn-primary w-100">
+                            <i class="fas fa-download me-2"></i>Download PDF Report
+                        </a>
+                        ` : ''}
+                    </div>
+                `;
+                
+                modal.show();
+            } catch (error) {
+                console.error('Failed to load report:', error);
+                showAlert('Failed to load report details', 'danger');
+            }
+        }
+        
+        async function loadProfile() {
+            const profileDiv = document.getElementById('profileInfo');
+            profileDiv.innerHTML = `
+                <div class="info-card">
+                    <h6><i class="fas fa-user-circle me-2"></i>Personal Information</h6>
+                    <p><strong>Name:</strong> ${currentUser.full_name}</p>
+                    <p><strong>Username:</strong> ${currentUser.username}</p>
+                    <p><strong>User Type:</strong> Patient</p>
+                </div>
+                <div class="info-card">
+                    <h6><i class="fas fa-chart-line me-2"></i>Health Statistics</h6>
+                    <p><strong>Reports Submitted:</strong> <span id="reportCount">Loading...</span></p>
+                </div>
+                <div class="info-card">
+                    <h6><i class="fas fa-info-circle me-2"></i>About NeuroDetect AI</h6>
+                    <p>This platform uses advanced AI to analyze medical scans. Always consult healthcare professionals for final diagnosis.</p>
+                    <p><strong>Process:</strong></p>
+                    <ol class="ms-3">
+                        <li>Upload your medical scan</li>
+                        <li>AI provides initial analysis</li>
+                        <li>Doctor reviews and provides feedback</li>
+                        <li>Download complete medical report</li>
+                    </ol>
+                </div>
+            `;
+            
+            // Update report count
+            try {
+                const response = await fetch('/api/patient/reports');
+                const data = await response.json();
+                document.getElementById('reportCount').textContent = data.reports ? data.reports.length : 0;
+            } catch (error) {
+                document.getElementById('reportCount').textContent = 'Unable to load';
+            }
+        }
+        
+        async function logout() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            await fetch('/api/logout', {method: 'POST'});
+            location.reload();
+        }
+        
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alertDiv);
+            setTimeout(() => alertDiv.remove(), 5000);
+        }
+
+        function getCurrentChatUserId() {
+            return (currentUser && (currentUser.patient_id || currentUser.doctor_id || currentUser.user_id)) || null;
+        }
+
+        function formatConfidence(value) {
+            if (typeof value === 'string' && value.trim()) {
+                return value.trim();
+            }
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) {
+                return 'N/A';
+            }
+            const percentValue = numericValue <= 1 ? numericValue * 100 : numericValue;
+            const formatted = percentValue.toFixed(2).replace(/\.00$/, '').replace(/(\.\d*[1-9])0$/, '$1');
+            return `${formatted}%`;
+        }
+
+        function renderConfidenceBadge(value) {
+            return `<span class="confidence-badge">${formatConfidence(value)}</span>`;
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setupSocket() {
+            if (socket || typeof io === 'undefined') {
+                return;
+            }
+
+            socket = io();
+            socket.on('connect', () => {
+                const currentUserId = getCurrentChatUserId();
+                if (currentUserId) {
+                    socket.emit('register_user', {user_id: currentUserId});
+                }
+            });
+            socket.on('receive_message', (data) => {
+                if (!chatPartnerId) {
+                    return;
+                }
+                const currentUserId = getCurrentChatUserId();
+                const isConversationMessage =
+                    (data.sender_id === currentUserId && data.receiver_id === chatPartnerId) ||
+                    (data.sender_id === chatPartnerId && data.receiver_id === currentUserId);
+                if (isConversationMessage) {
+                    loadMessages();
+                }
+                loadChatPartner();
+            });
+            socket.on('appointment_updated', (data) => {
+                const currentUserId = getCurrentChatUserId();
+                if (!currentUserId) {
+                    return;
+                }
+                const isRelevantAppointment =
+                    data.patient_id === currentUserId || data.doctor_id === currentUserId;
+                if (isRelevantAppointment) {
+                    loadAppointments();
+                }
+            });
+        }
+
+        function renderMediaMarkup(message) {
+            if (!message.file_url) {
+                return '';
+            }
+            const safeUrl = escapeHtml(message.file_url);
+            if (message.type === 'image') {
+                return `<img src="${safeUrl}" alt="Shared image" class="img-fluid rounded mt-2">`;
+            }
+            if (message.type === 'video') {
+                return `<video controls class="w-100 rounded mt-2"><source src="${safeUrl}"></video>`;
+            }
+            if (message.type === 'audio') {
+                return `<audio controls class="w-100 mt-2"><source src="${safeUrl}"></audio>`;
+            }
+            return `<a href="${safeUrl}" target="_blank" class="btn btn-primary mt-2">Open Media</a>`;
+        }
+
+        function renderMessages(messages) {
+            const box = document.getElementById('chatMessages');
+            const currentUserId = getCurrentChatUserId();
+            if (!box) {
+                return;
+            }
+
+            if (!messages.length) {
+                box.innerHTML = '<div class="info-card text-muted">No messages yet. Start the conversation with your doctor.</div>';
+                return;
+            }
+
+            box.innerHTML = messages.map((message) => {
+                const isSelf = message.sender_id === currentUserId;
+                const senderLabel = escapeHtml(message.sender_name || (isSelf ? 'You' : 'Doctor'));
+                const messageText = message.message ? `<p class="mb-0 mt-2">${escapeHtml(message.message)}</p>` : '';
+                return `
+                    <div class="${isSelf ? 'text-end' : ''}">
+                        <div class="info-card">
+                            <div class="d-flex justify-content-between ${isSelf ? 'flex-row-reverse' : ''}">
+                                <strong>${senderLabel}</strong>
+                                <small class="text-muted">${new Date(message.timestamp).toLocaleString()}</small>
+                            </div>
+                            ${messageText}
+                            ${renderMediaMarkup(message)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadChatPartner() {
+            const summaryBox = document.getElementById('chatPartnerSummary');
+            try {
+                const response = await fetch('/api/chat_users');
+                const data = await response.json();
+                if (data.users && data.users.length > 0) {
+                    const selectedPartner =
+                        data.users.find((user) => user.id === chatPartnerId) || data.users[0];
+                    chatPartnerId = selectedPartner.id;
+                    if (summaryBox) {
+                        summaryBox.innerHTML = `
+                            <p><strong>${escapeHtml(selectedPartner.full_name || selectedPartner.username || 'Assigned Doctor')}</strong></p>
+                            <p class="text-muted mb-0">${escapeHtml(selectedPartner.email || 'Available for consultation')}</p>
+                        `;
+                    }
+                    return true;
+                }
+                chatPartnerId = null;
+                if (summaryBox) {
+                    summaryBox.innerHTML = '<p class="text-muted mb-0">No doctor is linked to your account yet.</p>';
+                }
+                renderMessages([]);
+                return false;
+            } catch (error) {
+                chatPartnerId = null;
+                if (summaryBox) {
+                    summaryBox.innerHTML = '<p class="text-muted mb-0">Unable to load doctor details.</p>';
+                }
+                renderMessages([]);
+                return false;
+            }
+        }
+
+        function clearChatMediaSelection() {
+            const fileInput = document.getElementById('chatMediaInput');
+            const statusBox = document.getElementById('chatUploadStatus');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            if (statusBox) {
+                statusBox.textContent = '';
+            }
+        }
+
+        async function uploadChatMediaFile() {
+            const fileInput = document.getElementById('chatMediaInput');
+            const statusBox = document.getElementById('chatUploadStatus');
+            if (!fileInput || !fileInput.files || !fileInput.files.length) {
+                return null;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            if (statusBox) {
+                statusBox.textContent = `Uploading ${fileInput.files[0].name}...`;
+            }
+
+            const response = await fetch('/upload_media', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            if (!response.ok || result.error) {
+                throw new Error(result.error || 'Media upload failed');
+            }
+
+            if (statusBox) {
+                statusBox.textContent = `${fileInput.files[0].name} attached`;
+            }
+            return result;
+        }
+
+        async function initChatbox() {
+            if (!getCurrentChatUserId()) {
+                return;
+            }
+
+            setupSocket();
+            const hasPartner = await loadChatPartner();
+            if (hasPartner) {
+                await loadMessages();
+            }
+            await loadAppointmentCatalog();
+            await loadAppointments();
+        }
+
+        async function sendMsg() {
+            const input = document.getElementById('chatMessageInput');
+            const msg = (input && input.value ? input.value : '').trim();
+            if (!chatPartnerId || !getCurrentChatUserId()) {
+                showAlert('Please wait for the doctor conversation to load.', 'danger');
+                return;
+            }
+
+            let mediaPayload = null;
+            try {
+                mediaPayload = await uploadChatMediaFile();
+            } catch (error) {
+                showAlert(error.message, 'danger');
+                return;
+            }
+
+            if (!msg && !mediaPayload) {
+                showAlert('Please enter a message or attach media.', 'danger');
+                return;
+            }
+
+            const payload = {
+                sender_id: getCurrentChatUserId(),
+                receiver_id: chatPartnerId,
+                message: msg,
+                file_url: mediaPayload ? (mediaPayload.file_url || mediaPayload.url) : null,
+                type: mediaPayload ? mediaPayload.type : 'text'
+            };
+
+            if (socket && socket.connected) {
+                socket.emit('send_message', payload, (response) => {
+                    if (response && response.error) {
+                        showAlert(response.error, 'danger');
+                        return;
+                    }
+                    if (input) {
+                        input.value = '';
+                    }
+                    clearChatMediaSelection();
+                    loadMessages();
+                });
+                return;
+            }
+
+            const response = await fetch('/chat/send', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (!response.ok || result.error) {
+                showAlert(result.error || 'Unable to send message', 'danger');
+                return;
+            }
+
+            if (input) {
+                input.value = '';
+            }
+            clearChatMediaSelection();
+            await loadMessages();
+        }
+
+        async function loadMessages() {
+            if (!chatPartnerId) {
+                return;
+            }
+
+            const response = await fetch(`/chat/history/${chatPartnerId}`);
+            const data = await response.json();
+            const messages = Array.isArray(data) ? data : (data.messages || []);
+            renderMessages(messages);
+        }
+
+        function getAppointmentStatusClass(status) {
+            const normalizedStatus = String(status || '').toLowerCase();
+            if (normalizedStatus === 'confirmed' || normalizedStatus === 'completed' || normalizedStatus === 'approved') {
+                return 'approved';
+            }
+            if (normalizedStatus === 'cancelled' || normalizedStatus === 'rejected') {
+                return 'rejected';
+            }
+            if (normalizedStatus === 'reviewed') {
+                return 'reviewed';
+            }
+            return 'pending';
+        }
+
+        function formatAppointmentStatusLabel(status) {
+            const normalizedStatus = String(status || '').toLowerCase();
+            if (!normalizedStatus) {
+                return 'Pending';
+            }
+            return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
+        }
+
+        function getAppointmentDefaultValues() {
+            return {
+                fullName: appointmentForm.fullName || (currentUser && currentUser.full_name) || '',
+                phone: appointmentForm.phone || (currentPatientDetails && currentPatientDetails.phone) || '',
+                age: appointmentForm.age || (currentPatientDetails && currentPatientDetails.age) || '',
+                reason: appointmentForm.reason || ''
+            };
+        }
+
+        function getSelectedAppointmentSpecialty() {
+            return appointmentCatalog.specialties.find((specialty) => specialty.id === appointmentForm.specialtyId) || null;
+        }
+
+        function getSelectedAppointmentDoctor() {
+            return appointmentCatalog.doctors.find((doctor) => Number(doctor.id) === Number(appointmentForm.doctorId)) || null;
+        }
+
+        function resetAppointmentBooking() {
+            const defaults = getAppointmentDefaultValues();
+            appointmentAvailability = [];
+            appointmentForm = {
+                step: 1,
+                specialtyId: null,
+                doctorId: null,
+                date: '',
+                time: '',
+                fullName: defaults.fullName,
+                phone: defaults.phone,
+                age: defaults.age,
+                reason: defaults.reason,
+                confirmation: null
+            };
+            renderAppointmentWizard();
+        }
+
+        function renderAppointmentStepStatus() {
+            const container = document.getElementById('appointmentStepStatus');
+            if (!container) {
+                return;
+            }
+
+            const labels = ['Specialty', 'Doctor', 'Schedule', 'Confirm'];
+            container.innerHTML = labels.map((label, index) => {
+                const stepNumber = index + 1;
+                let badgeClass = 'status-pending';
+                if (appointmentForm.step === 5 || appointmentForm.step > stepNumber) {
+                    badgeClass = 'status-approved';
+                } else if (appointmentForm.step === stepNumber) {
+                    badgeClass = 'status-reviewed';
+                }
+                return `<span class="status-badge ${badgeClass}">${stepNumber}. ${escapeHtml(label)}</span>`;
+            }).join('');
+        }
+
+        function getFormattedAppointmentDate(dateValue) {
+            const parsedDate = new Date(`${dateValue}T00:00:00`);
+            if (Number.isNaN(parsedDate.getTime())) {
+                return dateValue;
+            }
+            return parsedDate.toLocaleDateString(undefined, {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function buildAppointmentSummary() {
+            const specialty = getSelectedAppointmentSpecialty();
+            const doctor = getSelectedAppointmentDoctor();
+            if (!doctor || !appointmentForm.date || !appointmentForm.time) {
+                return '';
+            }
+
+            return `
+                <div class="info-card">
+                    <p class="mb-1"><strong>Specialty:</strong> ${escapeHtml((specialty && specialty.label) || doctor.specialization || 'Consultation')}</p>
+                    <p class="mb-1"><strong>Doctor:</strong> ${escapeHtml(doctor.full_name || `Doctor ${doctor.id}`)}</p>
+                    ${doctor.hospital ? `<p class="mb-1"><strong>Hospital:</strong> ${escapeHtml(doctor.hospital)}</p>` : ''}
+                    ${doctor.experience ? `<p class="mb-1"><strong>Experience:</strong> ${escapeHtml(String(doctor.experience))} years</p>` : ''}
+                    <p class="mb-1"><strong>Date:</strong> ${escapeHtml(getFormattedAppointmentDate(appointmentForm.date))}</p>
+                    <p class="mb-0"><strong>Time:</strong> ${escapeHtml(appointmentForm.time)}</p>
+                </div>
+            `;
+        }
+
+        function renderAppointmentWizard() {
+            const container = document.getElementById('appointmentWizard');
+            renderAppointmentStepStatus();
+            if (!container) {
+                return;
+            }
+
+            const selectedSpecialty = getSelectedAppointmentSpecialty();
+            const selectedDoctor = getSelectedAppointmentDoctor();
+            const defaults = getAppointmentDefaultValues();
+
+            if (!appointmentCatalog.specialties.length && !appointmentCatalog.doctors.length) {
+                container.innerHTML = '<div class="text-muted">No doctors are available for booking right now.</div>';
+                return;
+            }
+
+            if (appointmentForm.step === 5 && appointmentForm.confirmation) {
+                container.innerHTML = `
+                    <div class="info-card">
+                        <h6><i class="fas fa-check-circle me-2"></i>Appointment Confirmed</h6>
+                        <p class="mb-1"><strong>Doctor:</strong> ${escapeHtml(appointmentForm.confirmation.doctor_name || 'Selected Doctor')}</p>
+                        <p class="mb-1"><strong>Date:</strong> ${escapeHtml(getFormattedAppointmentDate(appointmentForm.confirmation.date || appointmentForm.date))}</p>
+                        <p class="mb-3"><strong>Time:</strong> ${escapeHtml(appointmentForm.confirmation.time || appointmentForm.time)}</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-primary btn-sm" type="button" onclick="resetAppointmentBooking()">
+                                <i class="fas fa-plus me-2"></i>Book Another
+                            </button>
+                            <button class="btn btn-secondary btn-sm" type="button" onclick="openAppointmentChatTab()">
+                                <i class="fas fa-comments me-2"></i>Open Chat
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            if (appointmentForm.step === 1) {
+                container.innerHTML = `
+                    <p class="text-muted mb-3">Choose the specialty you want to consult.</p>
+                    <div class="row g-3">
+                        ${appointmentCatalog.specialties.map((specialty) => `
+                            <div class="col-md-6">
+                                <div class="info-card h-100 ${appointmentForm.specialtyId === specialty.id ? 'border border-primary' : ''}" style="cursor: pointer;" onclick="selectAppointmentSpecialty('${specialty.id}')">
+                                    <h6 class="mb-2">${escapeHtml(specialty.label)}</h6>
+                                    <p class="mb-0 text-muted">${escapeHtml(String(specialty.doctor_count || 0))} doctor(s) available</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                return;
+            }
+
+            if (appointmentForm.step === 2) {
+                const specialtyDoctors = appointmentCatalog.doctors.filter((doctor) => {
+                    if (!selectedSpecialty) {
+                        return true;
+                    }
+                    return String(doctor.specialization || '').trim().toLowerCase() === String(selectedSpecialty.label || '').trim().toLowerCase();
+                });
+
+                container.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="goToAppointmentStep(1)">
+                            <i class="fas fa-arrow-left me-2"></i>Back
+                        </button>
+                        <span class="text-muted">Choose a doctor in ${escapeHtml((selectedSpecialty && selectedSpecialty.label) || 'this specialty')}.</span>
+                    </div>
+                    ${specialtyDoctors.length ? specialtyDoctors.map((doctor) => `
+                        <div class="info-card ${Number(appointmentForm.doctorId) === Number(doctor.id) ? 'border border-primary' : ''}">
+                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                <div>
+                                    <h6 class="mb-1">${escapeHtml(doctor.full_name || `Doctor ${doctor.id}`)}</h6>
+                                    <p class="mb-1 text-muted">${escapeHtml(doctor.specialization || 'Consultation')}</p>
+                                    ${doctor.experience ? `<p class="mb-1 text-muted">Experience: ${escapeHtml(String(doctor.experience))} years</p>` : ''}
+                                    ${doctor.hospital ? `<p class="mb-0 text-muted">${escapeHtml(doctor.hospital)}</p>` : ''}
+                                </div>
+                                <button class="btn btn-primary btn-sm" type="button" onclick="selectAppointmentDoctor(${doctor.id})">
+                                    <i class="fas fa-user-check me-2"></i>Select
+                                </button>
+                            </div>
+                        </div>
+                    `).join('') : '<div class="info-card text-muted">No doctors are available in this specialty right now.</div>'}
+                `;
+                return;
+            }
+
+            if (appointmentForm.step === 3) {
+                const selectedDay = appointmentAvailability.find((slot) => slot.date === appointmentForm.date) || null;
+                const availableTimes = selectedDay ? (selectedDay.available_slots || []) : [];
+
+                container.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="goToAppointmentStep(2)">
+                            <i class="fas fa-arrow-left me-2"></i>Back
+                        </button>
+                        <span class="text-muted">Pick a date and time for your visit.</span>
+                    </div>
+                    ${selectedDoctor ? `
+                        <div class="info-card">
+                            <p class="mb-1"><strong>Doctor:</strong> ${escapeHtml(selectedDoctor.full_name || `Doctor ${selectedDoctor.id}`)}</p>
+                            <p class="mb-0 text-muted">${escapeHtml(selectedDoctor.specialization || 'Consultation')}</p>
+                        </div>
+                    ` : ''}
+                    <div class="mb-3">
+                        <label class="form-label">Available Dates</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            ${appointmentAvailability.map((slot) => `
+                                <button
+                                    class="btn ${appointmentForm.date === slot.date ? 'btn-primary' : 'btn-secondary'} btn-sm"
+                                    type="button"
+                                    ${!(slot.available_slots || []).length ? 'disabled' : ''}
+                                    onclick="selectAppointmentDate('${slot.date}')"
+                                >
+                                    ${escapeHtml(`${slot.day} ${slot.day_number} ${slot.month}`)}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Available Time Slots</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            ${availableTimes.length ? availableTimes.map((slotTime) => `
+                                <button
+                                    class="btn ${appointmentForm.time === slotTime ? 'btn-primary' : 'btn-secondary'} btn-sm"
+                                    type="button"
+                                    onclick="selectAppointmentTime('${slotTime}')"
+                                >
+                                    ${escapeHtml(slotTime)}
+                                </button>
+                            `).join('') : '<span class="text-muted">Choose a date to see available time slots.</span>'}
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" type="button" onclick="goToAppointmentStep(4)" ${!(appointmentForm.date && appointmentForm.time) ? 'disabled' : ''}>
+                        <i class="fas fa-arrow-right me-2"></i>Continue
+                    </button>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <button class="btn btn-secondary btn-sm" type="button" onclick="goToAppointmentStep(3)">
+                        <i class="fas fa-arrow-left me-2"></i>Back
+                    </button>
+                    <span class="text-muted">Confirm your appointment details.</span>
+                </div>
+                ${buildAppointmentSummary()}
+                <div class="mb-3">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" class="form-control" id="appointmentFullName" value="${escapeHtml(defaults.fullName)}" placeholder="Enter your full name">
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" class="form-control" id="appointmentPhone" value="${escapeHtml(defaults.phone)}" placeholder="Enter your phone number">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Age</label>
+                        <input type="number" class="form-control" id="appointmentAge" min="1" max="120" value="${escapeHtml(defaults.age)}" placeholder="Enter your age">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Reason for Visit</label>
+                    <textarea class="form-control" id="appointmentReason" rows="3" placeholder="Describe your health concern...">${escapeHtml(defaults.reason)}</textarea>
+                </div>
+                <button class="btn btn-primary w-100" type="button" onclick="bookAppointment()">
+                    <i class="fas fa-calendar-check me-2"></i>Confirm Appointment
+                </button>
+            `;
+        }
+
+        async function loadAppointmentCatalog(forceReload = false) {
+            if (!getCurrentChatUserId()) {
+                return;
+            }
+
+            if (!forceReload && (appointmentCatalog.specialties.length || appointmentCatalog.doctors.length)) {
+                if (!appointmentForm.fullName) {
+                    resetAppointmentBooking();
+                } else {
+                    renderAppointmentWizard();
+                }
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/appointment_options');
+                const data = await response.json();
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Unable to load appointment options');
+                }
+
+                appointmentCatalog = {
+                    specialties: Array.isArray(data.specialties) ? data.specialties : [],
+                    doctors: Array.isArray(data.doctors) ? data.doctors : []
+                };
+                resetAppointmentBooking();
+            } catch (error) {
+                const container = document.getElementById('appointmentWizard');
+                if (container) {
+                    container.innerHTML = `<div class="text-muted">${escapeHtml(error.message || 'Unable to load appointment options.')}</div>`;
+                }
+            }
+        }
+
+        function selectAppointmentSpecialty(specialtyId) {
+            appointmentForm.specialtyId = specialtyId;
+            appointmentForm.doctorId = null;
+            appointmentForm.date = '';
+            appointmentForm.time = '';
+            appointmentForm.confirmation = null;
+            appointmentAvailability = [];
+            appointmentForm.step = 2;
+            renderAppointmentWizard();
+        }
+
+        async function selectAppointmentDoctor(doctorId) {
+            appointmentForm.doctorId = Number(doctorId);
+            appointmentForm.date = '';
+            appointmentForm.time = '';
+            appointmentForm.confirmation = null;
+            appointmentAvailability = [];
+            appointmentForm.step = 3;
+            renderAppointmentWizard();
+            await loadAppointmentSlots(doctorId);
+        }
+
+        async function loadAppointmentSlots(doctorId) {
+            try {
+                const response = await fetch(`/api/appointment_slots/${doctorId}`);
+                const data = await response.json();
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Unable to load appointment availability');
+                }
+
+                appointmentAvailability = Array.isArray(data.slots) ? data.slots : [];
+                const firstAvailableDay = appointmentAvailability.find((slot) => Array.isArray(slot.available_slots) && slot.available_slots.length);
+                if (!appointmentForm.date && firstAvailableDay) {
+                    appointmentForm.date = firstAvailableDay.date;
+                }
+                if (appointmentForm.date) {
+                    const selectedDay = appointmentAvailability.find((slot) => slot.date === appointmentForm.date);
+                    if (!selectedDay || !(selectedDay.available_slots || []).includes(appointmentForm.time)) {
+                        appointmentForm.time = '';
+                    }
+                }
+                renderAppointmentWizard();
+            } catch (error) {
+                appointmentAvailability = [];
+                renderAppointmentWizard();
+                showAlert(error.message || 'Unable to load appointment slots', 'danger');
+            }
+        }
+
+        function selectAppointmentDate(dateValue) {
+            appointmentForm.date = dateValue;
+            const selectedDay = appointmentAvailability.find((slot) => slot.date === dateValue);
+            if (!selectedDay || !(selectedDay.available_slots || []).includes(appointmentForm.time)) {
+                appointmentForm.time = '';
+            }
+            renderAppointmentWizard();
+        }
+
+        function selectAppointmentTime(timeValue) {
+            appointmentForm.time = timeValue;
+            renderAppointmentWizard();
+        }
+
+        function goToAppointmentStep(stepNumber) {
+            if (stepNumber === 1) {
+                appointmentAvailability = [];
+                appointmentForm.step = 1;
+                appointmentForm.specialtyId = null;
+                appointmentForm.doctorId = null;
+                appointmentForm.date = '';
+                appointmentForm.time = '';
+            } else if (stepNumber === 2) {
+                appointmentAvailability = [];
+                appointmentForm.step = 2;
+                appointmentForm.doctorId = null;
+                appointmentForm.date = '';
+                appointmentForm.time = '';
+            } else if (stepNumber === 3) {
+                appointmentForm.step = 3;
+            } else if (stepNumber === 4) {
+                if (!appointmentForm.date || !appointmentForm.time) {
+                    showAlert('Please choose a date and time slot first.', 'danger');
+                    return;
+                }
+                appointmentForm.step = 4;
+            }
+            renderAppointmentWizard();
+        }
+
+        function openAppointmentChatTab() {
+            const chatTab = document.getElementById('chat-tab');
+            if (chatTab) {
+                chatTab.click();
+            }
+        }
+
+        function renderAppointmentActions(appointment) {
+            const normalizedStatus = String(appointment.status || '').toLowerCase();
+            if (normalizedStatus === 'pending' || normalizedStatus === 'confirmed') {
+                return `
+                    <button class="btn btn-danger btn-sm mt-3" type="button" onclick="cancelAppointment(${appointment.id})">
+                        <i class="fas fa-times me-2"></i>Cancel Appointment
+                    </button>
+                `;
+            }
+            return '';
+        }
+
+        function renderAppointments(appointments) {
+            const container = document.getElementById('appointmentsList');
+            if (!container) {
+                return;
+            }
+
+            if (!appointments.length) {
+                container.innerHTML = '<div class="info-card text-muted">No appointments scheduled yet.</div>';
+                return;
+            }
+
+            container.innerHTML = appointments.map((appointment) => `
+                <div class="info-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="mb-1"><strong>Doctor:</strong> ${escapeHtml(appointment.doctor_name || 'Assigned Doctor')}</p>
+                            ${appointment.doctor_specialization ? `<p class="mb-1"><strong>Specialty:</strong> ${escapeHtml(appointment.doctor_specialization)}</p>` : ''}
+                            ${appointment.doctor_hospital ? `<p class="mb-1"><strong>Hospital:</strong> ${escapeHtml(appointment.doctor_hospital)}</p>` : ''}
+                            <p class="mb-1"><strong>Date:</strong> ${escapeHtml(appointment.date)}</p>
+                            <p class="mb-0"><strong>Time:</strong> ${escapeHtml(appointment.time)}</p>
+                        </div>
+                        <span class="status-badge status-${getAppointmentStatusClass(appointment.status)}">${escapeHtml(formatAppointmentStatusLabel(appointment.status))}</span>
+                    </div>
+                    ${renderAppointmentActions(appointment)}
+                </div>
+            `).join('');
+        }
+
+        async function loadAppointments() {
+            const currentUserId = getCurrentChatUserId();
+            if (!currentUserId) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/get_appointments/${currentUserId}`);
+                const data = await response.json();
+                renderAppointments(data.appointments || []);
+            } catch (error) {
+                renderAppointments([]);
+            }
+        }
+
+        async function cancelAppointment(appointmentId) {
+            const response = await fetch(`/api/appointments/${appointmentId}/status`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: 'cancelled'})
+            });
+            const result = await response.json();
+            if (!response.ok || result.error) {
+                showAlert(result.error || 'Unable to cancel appointment', 'danger');
+                return;
+            }
+            await loadAppointments();
+            showAlert('Appointment cancelled successfully', 'success');
+        }
+
+        async function bookAppointment() {
+            if (!getCurrentChatUserId()) {
+                showAlert('Please login first', 'danger');
+                return;
+            }
+
+            const selectedDoctor = getSelectedAppointmentDoctor();
+            if (!selectedDoctor) {
+                showAlert('Please select a doctor first', 'danger');
+                return;
+            }
+
+            const fullNameInput = document.getElementById('appointmentFullName');
+            const phoneInput = document.getElementById('appointmentPhone');
+            const ageInput = document.getElementById('appointmentAge');
+            const reasonInput = document.getElementById('appointmentReason');
+            appointmentForm.fullName = fullNameInput ? fullNameInput.value.trim() : appointmentForm.fullName;
+            appointmentForm.phone = phoneInput ? phoneInput.value.trim() : appointmentForm.phone;
+            appointmentForm.age = ageInput ? ageInput.value.trim() : appointmentForm.age;
+            appointmentForm.reason = reasonInput ? reasonInput.value.trim() : appointmentForm.reason;
+
+            if (!appointmentForm.fullName || !appointmentForm.phone || !appointmentForm.age) {
+                showAlert('Please fill in your name, phone, and age before confirming.', 'danger');
+                return;
+            }
+
+            if (!appointmentForm.date || !appointmentForm.time) {
+                showAlert('Please choose a date and time before confirming.', 'danger');
+                return;
+            }
+
+            const response = await fetch('/book_appointment', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    patient_id: getCurrentChatUserId(),
+                    doctor_id: selectedDoctor.id,
+                    date: appointmentForm.date,
+                    time: appointmentForm.time,
+                    full_name: appointmentForm.fullName,
+                    phone: appointmentForm.phone,
+                    age: appointmentForm.age,
+                    reason: appointmentForm.reason
+                })
+            });
+            const result = await response.json();
+            if (!response.ok || result.error) {
+                await loadAppointmentSlots(selectedDoctor.id);
+                showAlert(result.error || 'Appointment booking failed', 'danger');
+                return;
+            }
+
+            appointmentForm.confirmation = result.appointment || {
+                doctor_name: selectedDoctor.full_name,
+                date: appointmentForm.date,
+                time: appointmentForm.time
+            };
+            appointmentForm.step = 5;
+            chatPartnerId = selectedDoctor.id;
+            await loadChatPartner();
+            await loadAppointments();
+            renderAppointmentWizard();
+            showAlert('Appointment booked successfully', 'success');
+        }
+        
+        // Check auth
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/check-auth');
+                const data = await response.json();
+                if (data.authenticated && data.user_type === 'patient') {
+                    currentUser = data;
+                    document.getElementById('authSection').style.display = 'none';
+                    document.getElementById('dashboardSection').style.display = 'block';
+                    document.getElementById('logoutBtn').style.display = 'block';
+                    document.getElementById('userName').textContent = data.full_name;
+                    
+                    // Load patient details
+                    await loadPatientDetails();
+                    
+                    // Pre-fill patient info if available
+                    if (currentPatientDetails) {
+                        document.getElementById('patientName').value = currentPatientDetails.full_name || '';
+                        document.getElementById('patientAge').value = currentPatientDetails.age || '';
+                        document.getElementById('patientGender').value = currentPatientDetails.gender || '';
+                    }
+                    
+                    loadReports();
+                    loadProfile();
+                    initChatbox();
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+            }
+        }
+        
+        checkAuth();
+    </script>
+</body>
+</html>

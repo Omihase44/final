@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroDetect AI - Advanced Brain Health Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+        
+        .hero-section {
+            padding: 100px 0;
+            color: white;
+            text-align: center;
+        }
+        
+        .hero-section h1 {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            animation: fadeInUp 1s ease;
+        }
+        
+        .hero-section p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 2rem;
+            animation: fadeInUp 1s ease 0.2s both;
+        }
+        
+        .portal-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            height: 100%;
+            animation: fadeInUp 1s ease;
+        }
+        
+        .portal-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        
+        .portal-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .feature-icon {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .stats-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 3rem;
+            margin-top: 3rem;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .btn-custom {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-custom:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            color: white;
+        }
+        
+        footer {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 2rem 0;
+            margin-top: 3rem;
+        }
+        
+        @media (max-width: 768px) {
+            .hero-section h1 {
+                font-size: 2rem;
+            }
+            
+            .hero-section p {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                <i class="fas fa-brain me-2"></i>NeuroDetect AI
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#features">Features</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#about">About</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#contact">Contact</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="hero-section">
+        <div class="container">
+            <h1>Advanced AI-Powered Brain Health Detection</h1>
+            <p>Revolutionizing medical diagnostics with cutting-edge artificial intelligence</p>
+            <div class="d-flex justify-content-center gap-3 flex-wrap">
+                <button class="btn btn-custom btn-lg" onclick="location.href='/patient'">
+                    <i class="fas fa-user me-2"></i>Patient Portal
+                </button>
+                <button class="btn btn-custom btn-lg" onclick="location.href='/doctor'">
+                    <i class="fas fa-user-md me-2"></i>Doctor Portal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row g-4 mb-5">
+            <div class="col-md-6">
+                <div class="portal-card" onclick="location.href='/patient'">
+                    <div class="portal-icon">
+                        <i class="fas fa-user-injured"></i>
+                    </div>
+                    <h3>Patient Portal</h3>
+                    <p>Upload your medical scans, get instant AI analysis, track your health records, and receive personalized treatment recommendations from healthcare professionals.</p>
+                    <div class="mt-3">
+                        <span class="badge bg-primary me-2">Fast Analysis</span>
+                        <span class="badge bg-success me-2">Secure</span>
+                        <span class="badge bg-info">24/7 Access</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="portal-card" onclick="location.href='/doctor'">
+                    <div class="portal-icon">
+                        <i class="fas fa-stethoscope"></i>
+                    </div>
+                    <h3>Doctor Portal</h3>
+                    <p>Review patient reports, provide professional diagnosis, prescribe treatments, and monitor patient progress with comprehensive analytics.</p>
+                    <div class="mt-3">
+                        <span class="badge bg-primary me-2">AI-Assisted</span>
+                        <span class="badge bg-success me-2">Efficient</span>
+                        <span class="badge bg-info">Real-time</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="features" class="stats-section">
+            <h2 class="text-center mb-4" style="color: var(--primary-color);">Why Choose NeuroDetect AI?</h2>
+            <div class="row g-4">
+                <div class="col-md-3 col-sm-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h5>98% Accuracy</h5>
+                        <p class="text-muted">State-of-the-art AI models trained on thousands of medical images</p>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h5>Fast Analysis</h5>
+                        <p class="text-muted">Get results in under 30 seconds</p>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <h5>Secure & Private</h5>
+                        <p class="text-muted">Your medical data is encrypted and secure</p>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h5>Comprehensive Reports</h5>
+                        <p class="text-muted">Detailed analysis with treatment recommendations</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="about" class="row mt-5">
+            <div class="col-12 text-center text-white">
+                <h3>How It Works</h3>
+                <div class="row mt-4">
+                    <div class="col-md-3">
+                        <i class="fas fa-upload fa-3x mb-3"></i>
+                        <h5>1. Upload Scan</h5>
+                        <p>Upload your MRI or CT scan image</p>
+                    </div>
+                    <div class="col-md-3">
+                        <i class="fas fa-microchip fa-3x mb-3"></i>
+                        <h5>2. AI Analysis</h5>
+                        <p>Advanced AI analyzes the image</p>
+                    </div>
+                    <div class="col-md-3">
+                        <i class="fas fa-user-md fa-3x mb-3"></i>
+                        <h5>3. Doctor Review</h5>
+                        <p>Medical professional reviews results</p>
+                    </div>
+                    <div class="col-md-3">
+                        <i class="fas fa-file-pdf fa-3x mb-3"></i>
+                        <h5>4. Get Report</h5>
+                        <p>Receive comprehensive medical report</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer id="contact">
+        <div class="container text-center">
+            <p class="mb-2">⚠️ Disclaimer: This tool is for educational and assistive purposes. Always consult healthcare professionals for medical diagnosis and treatment.</p>
+            <p class="mb-0">&copy; 2024 NeuroDetect AI. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
