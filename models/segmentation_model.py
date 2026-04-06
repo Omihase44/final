@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 from utils.image_processing import preprocess_segmentation_image
-from utils.tensorflow_compat import get_tensorflow_keras, safe_load_keras_model
+from utils.tensorflow_compat import get_tensorflow_keras, resolve_model_path, safe_load_keras_model
 
 
 def build_unet_model(
@@ -75,12 +75,16 @@ class TumorSegmentationModel:
         model_path: Optional[str] = None,
         input_size: tuple[int, int] = (128, 128),
     ):
-        default_model_path = os.environ.get("SEGMENTATION_MODEL_PATH") or os.path.join(
-            "models",
-            "tumor_segmentation_unet.h5",
+        default_model_path = model_path or os.path.join("models", "tumor_segmentation_unet.h5")
+        self.model_path = (
+            resolve_model_path(
+                default_model_path,
+                "SEGMENTATION_MODEL_PATH",
+                manifest_key="tumor_segmentation",
+            )
+            if default_model_path
+            else None
         )
-        resolved_model_path = model_path or default_model_path
-        self.model_path = os.path.abspath(resolved_model_path) if resolved_model_path else None
         self.input_size = input_size
         self.model = self._load_model()
         self.backend = "keras" if self.model is not None else "heuristic"
@@ -90,11 +94,16 @@ class TumorSegmentationModel:
             return None
         return safe_load_keras_model(self.model_path)
 
-    def predict_mask(self, image: np.ndarray, tumor_detected: bool = True) -> np.ndarray:
+    def predict_mask(
+        self,
+        image: np.ndarray,
+        tumor_detected: bool = True,
+        model_input: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
         if not tumor_detected:
             return np.zeros(image.shape[:2], dtype=np.uint8)
 
-        model_input = preprocess_segmentation_image(image, self.input_size)
+        model_input = model_input if model_input is not None else preprocess_segmentation_image(image, self.input_size)
 
         if self.model is not None:
             mask = self._predict_with_model(model_input)
@@ -111,13 +120,14 @@ class TumorSegmentationModel:
     def _predict_with_model(self, model_input: np.ndarray) -> np.ndarray:
         try:
             prediction = self.model.predict(model_input, verbose=0)[0, :, :, 0]
-            return np.where(prediction >= 0.5, 255, 0).astype(np.uint8)
+            smoothed_prediction = cv2.GaussianBlur(prediction.astype(np.float32), (5, 5), 0)
+            return np.where(smoothed_prediction >= 0.45, 255, 0).astype(np.uint8)
         except Exception:
             return self._heuristic_mask(model_input[0, :, :, 0])
 
     def _heuristic_mask(self, normalized_image: np.ndarray) -> np.ndarray:
         image_u8 = np.clip(normalized_image * 255.0, 0, 255).astype(np.uint8)
-        blurred = cv2.GaussianBlur(image_u8, (5, 5), 0)
+        blurred = cv2.GaussianBlur(image_u8, (5, 5), 0.8)
 
         _, otsu_mask = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         percentile_value = int(np.percentile(blurred, 90))
@@ -125,14 +135,17 @@ class TumorSegmentationModel:
         mask = cv2.bitwise_and(otsu_mask, high_intensity_mask)
 
         kernel = np.ones((3, 3), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        mask = cv2.threshold(mask, 32, 255, cv2.THRESH_BINARY)[1]
+        mask = cv2.erode(mask, kernel, iterations=1)
+        mask = cv2.dilate(mask, kernel, iterations=2)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
 
         largest_component = self._largest_component(mask)
         if np.count_nonzero(largest_component) == 0:
             percentile_value = int(np.percentile(blurred, 95))
             _, fallback_mask = cv2.threshold(blurred, percentile_value, 255, cv2.THRESH_BINARY)
-            largest_component = self._largest_component(fallback_mask)
+            largest_component = self._largest_component(self._refine_mask(fallback_mask))
 
         return largest_component
 
@@ -151,7 +164,27 @@ class TumorSegmentationModel:
         return np.where(labels == largest_label, 255, 0).astype(np.uint8)
 
     def _postprocess_mask(self, mask: np.ndarray) -> np.ndarray:
-        kernel = np.ones((5, 5), np.uint8)
-        cleaned = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
-        cleaned = cv2.morphologyEx(cleaned, cv2.MORPH_OPEN, kernel, iterations=1)
-        return self._largest_component(cleaned)
+        refined = self._refine_mask(mask)
+        return self._largest_component(refined)
+
+    def _refine_mask(self, mask: np.ndarray) -> np.ndarray:
+        thresholded = cv2.threshold(mask.astype(np.uint8), 32, 255, cv2.THRESH_BINARY)[1]
+        kernel_small = np.ones((3, 3), np.uint8)
+        kernel_large = np.ones((5, 5), np.uint8)
+
+        refined = cv2.erode(thresholded, kernel_small, iterations=1)
+        refined = cv2.dilate(refined, kernel_small, iterations=2)
+        refined = cv2.morphologyEx(refined, cv2.MORPH_OPEN, kernel_small, iterations=1)
+        refined = cv2.morphologyEx(refined, cv2.MORPH_CLOSE, kernel_large, iterations=2)
+        refined = self._largest_component(refined)
+
+        if np.count_nonzero(refined) == 0:
+            return refined
+
+        contours, _ = cv2.findContours(refined, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return refined
+
+        filled_mask = np.zeros_like(refined, dtype=np.uint8)
+        cv2.drawContours(filled_mask, contours, -1, 255, thickness=cv2.FILLED)
+        return filled_mask

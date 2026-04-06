@@ -1,6 +1,7 @@
 import os
 import json
 import sqlite3
+from contextlib import closing
 from datetime import date, datetime, time, timedelta
 from hashlib import sha1
 from typing import Optional, Tuple
@@ -82,6 +83,15 @@ def _open_connection(db_path: str) -> sqlite3.Connection:
     return connection
 
 
+def _ensure_column(connection: sqlite3.Connection, table_name: str, column_name: str, column_definition: str) -> None:
+    existing_columns = {
+        row[1]
+        for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name not in existing_columns:
+        connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
+
+
 def _parse_int_field(value, field_name: str) -> int:
     try:
         return int(value)
@@ -140,6 +150,63 @@ def _safe_time_sort_key(value) -> time:
         return time.max
 
 
+def _normalize_optional_text(value) -> str:
+    return str(value or "").strip()
+
+
+def _resolve_calendar_window(view_name: str, start_value: Optional[str] = None) -> Tuple[str, date, date]:
+    normalized_view = str(view_name or "week").strip().lower()
+    if normalized_view not in {"week", "month"}:
+        normalized_view = "week"
+
+    if start_value:
+        try:
+            start_date = datetime.strptime(str(start_value), "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError("Invalid calendar start date.") from exc
+    else:
+        today = date.today()
+        start_date = today - timedelta(days=today.weekday()) if normalized_view == "week" else today.replace(day=1)
+
+    if normalized_view == "month":
+        month_anchor = start_date.replace(day=1)
+        if month_anchor.month == 12:
+            next_month = month_anchor.replace(year=month_anchor.year + 1, month=1, day=1)
+        else:
+            next_month = month_anchor.replace(month=month_anchor.month + 1, day=1)
+        end_date = next_month - timedelta(days=1)
+        return normalized_view, month_anchor, end_date
+
+    end_date = start_date + timedelta(days=6)
+    return normalized_view, start_date, end_date
+
+
+def _build_calendar_payload(appointments: list[dict], start_date: date, end_date: date) -> list[dict]:
+    grouped = {}
+    for appointment in appointments:
+        grouped.setdefault(appointment["date"], []).append(appointment)
+
+    days = []
+    current_day = start_date
+    while current_day <= end_date:
+        day_key = current_day.isoformat()
+        day_appointments = grouped.get(day_key, [])
+        day_appointments.sort(key=lambda item: (_safe_time_sort_key(item["time"]), item["id"]))
+        days.append(
+            {
+                "date": day_key,
+                "label": current_day.strftime("%A, %B %d, %Y"),
+                "day": current_day.strftime("%a"),
+                "day_number": current_day.day,
+                "month": current_day.strftime("%b"),
+                "appointment_count": len(day_appointments),
+                "appointments": day_appointments,
+            }
+        )
+        current_day += timedelta(days=1)
+    return days
+
+
 def _assign_patient_to_doctor(users_payload: dict, patient_id: int, doctor_id: int) -> Tuple[Optional[dict], Optional[dict]]:
     patient_record = get_patient_record(users_payload, patient_id)
     doctor_record = get_doctor_record(users_payload, doctor_id)
@@ -175,8 +242,8 @@ def _emit_appointment_update(db_path: str, payload: dict) -> None:
     if socketio is None:
         return
 
-    socketio.emit("appointment_updated", payload, to=get_socket_room(payload["patient_id"]))
-    socketio.emit("appointment_updated", payload, to=get_socket_room(payload["doctor_id"]))
+    socketio.emit("appointment_updated", payload, to=get_socket_room(payload["patient_id"], "patient"))
+    socketio.emit("appointment_updated", payload, to=get_socket_room(payload["doctor_id"], "doctor"))
 
 
 def _serialize_appointment_row(row: sqlite3.Row, patient_lookup: dict, doctor_lookup: dict) -> dict:
@@ -185,7 +252,7 @@ def _serialize_appointment_row(row: sqlite3.Row, patient_lookup: dict, doctor_lo
     return {
         "id": row["id"],
         "patient_id": row["patient_id"],
-        "patient_name": patient_record.get("full_name") or patient_record.get("username") or f"Patient {row['patient_id']}",
+        "patient_name": row["full_name"] or patient_record.get("full_name") or patient_record.get("username") or f"Patient {row['patient_id']}",
         "doctor_id": row["doctor_id"],
         "doctor_name": doctor_record.get("full_name") or doctor_record.get("username") or f"Doctor {row['doctor_id']}",
         "doctor_specialization": _normalize_specialization(doctor_record.get("specialization")),
@@ -195,6 +262,10 @@ def _serialize_appointment_row(row: sqlite3.Row, patient_lookup: dict, doctor_lo
         "time": row["time"],
         "status": row["status"],
         "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "phone": str(row["phone"] or patient_record.get("phone") or "").strip(),
+        "age": str(row["age"] or patient_record.get("age") or "").strip(),
+        "reason": str(row["reason"] or "").strip(),
     }
 
 
@@ -207,15 +278,38 @@ def _create_appointment_schema(connection: sqlite3.Connection) -> None:
             doctor_id INTEGER NOT NULL,
             date TEXT NOT NULL,
             time TEXT NOT NULL,
+            full_name TEXT,
+            phone TEXT,
+            age TEXT,
+            reason TEXT,
             status TEXT NOT NULL DEFAULT 'pending',
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
+        """
+    )
+    _ensure_column(connection, "appointments", "full_name", "TEXT")
+    _ensure_column(connection, "appointments", "phone", "TEXT")
+    _ensure_column(connection, "appointments", "age", "TEXT")
+    _ensure_column(connection, "appointments", "reason", "TEXT")
+    _ensure_column(connection, "appointments", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    connection.execute(
+        """
+        UPDATE appointments
+        SET updated_at = COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)
+        WHERE updated_at IS NULL OR TRIM(updated_at) = ''
         """
     )
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_appointments_patient_doctor_date
         ON appointments(patient_id, doctor_id, date, time)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_appointments_doctor_date
+        ON appointments(doctor_id, date, time, status)
         """
     )
 
@@ -275,6 +369,24 @@ def create_appointment_blueprint(
             for doctor in users_payload.get("doctors", [])
         }
         return users_payload, patient_lookup, doctor_lookup
+
+    def _fetch_appointments_for_user(user_id: int, role: str) -> list[dict]:
+        _, patient_lookup, doctor_lookup = build_directory_maps()
+        query_field = "patient_id" if role == "patient" else "doctor_id"
+        with closing(get_connection()) as connection:
+            rows = connection.execute(
+                f"""
+                SELECT id, patient_id, doctor_id, date, time, full_name, phone, age, reason, status, created_at, updated_at
+                FROM appointments
+                WHERE {query_field} = ?
+                ORDER BY date ASC, time ASC, id DESC
+                """,
+                (user_id,),
+            ).fetchall()
+
+        appointments = [_serialize_appointment_row(row, patient_lookup, doctor_lookup) for row in rows]
+        appointments.sort(key=lambda item: (_safe_date_sort_key(item["date"]), _safe_time_sort_key(item["time"]), item["id"]))
+        return appointments
 
     @appointment_bp.route("/appointment_options", methods=["GET"])
     @appointment_bp.route("/api/appointment_options", methods=["GET"])
@@ -342,7 +454,7 @@ def create_appointment_blueprint(
 
             earliest_date = (date.today() + timedelta(days=1)).isoformat()
             booked_slots_by_date = {}
-            with get_connection() as connection:
+            with closing(get_connection()) as connection:
                 rows = connection.execute(
                     """
                     SELECT date, time, status
@@ -395,6 +507,8 @@ def create_appointment_blueprint(
 
     @appointment_bp.route("/book_appointment", methods=["POST"])
     @appointment_bp.route("/api/book_appointment", methods=["POST"])
+    @appointment_bp.route("/book-appointment", methods=["POST"])
+    @appointment_bp.route("/api/book-appointment", methods=["POST"])
     @login_required_factory()
     def book_appointment():
         try:
@@ -406,21 +520,17 @@ def create_appointment_blueprint(
             current_user_id = int(session.get("user_id"))
             current_role = session.get("user_type")
 
-            patient_id = _parse_int_field(
-                payload.get("patient_id", current_user_id if current_role == "patient" else None),
-                "patient_id",
-            )
-            doctor_id = _parse_int_field(
-                payload.get("doctor_id", current_user_id if current_role == "doctor" else None),
-                "doctor_id",
-            )
+            if current_role == "patient":
+                patient_id = current_user_id
+                doctor_id = _parse_int_field(payload.get("doctor_id"), "doctor_id")
+            elif current_role == "doctor":
+                patient_id = _parse_int_field(payload.get("patient_id"), "patient_id")
+                doctor_id = current_user_id
+            else:
+                return jsonify({"error": "Unauthorized appointment access."}), 403
+
             appointment_date = _normalize_date_string(payload.get("date"))
             appointment_time = _normalize_time_string(payload.get("time"))
-
-            if current_role == "patient" and patient_id != current_user_id:
-                return jsonify({"error": "Patient mismatch for the authenticated user."}), 403
-            if current_role == "doctor" and doctor_id != current_user_id:
-                return jsonify({"error": "Doctor mismatch for the authenticated user."}), 403
 
             users_payload = load_users_func()
             patient_record = get_patient_record(users_payload, patient_id)
@@ -430,7 +540,12 @@ def create_appointment_blueprint(
             if doctor_record is None:
                 return jsonify({"error": "Doctor not found."}), 404
 
-            with get_connection() as connection:
+            patient_name = _normalize_optional_text(payload.get("full_name")) or _normalize_optional_text(patient_record.get("full_name"))
+            patient_phone = _normalize_optional_text(payload.get("phone")) or _normalize_optional_text(patient_record.get("phone"))
+            patient_age = _normalize_optional_text(payload.get("age")) or _normalize_optional_text(patient_record.get("age"))
+            appointment_reason = _normalize_optional_text(payload.get("reason"))
+
+            with closing(get_connection()) as connection:
                 conflicting_appointment = connection.execute(
                     """
                     SELECT id
@@ -449,17 +564,28 @@ def create_appointment_blueprint(
 
                 cursor = connection.execute(
                     """
-                    INSERT INTO appointments (patient_id, doctor_id, date, time, status)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO appointments (patient_id, doctor_id, date, time, full_name, phone, age, reason, status, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (patient_id, doctor_id, appointment_date, appointment_time, "pending"),
+                    (
+                        patient_id,
+                        doctor_id,
+                        appointment_date,
+                        appointment_time,
+                        patient_name,
+                        patient_phone,
+                        patient_age,
+                        appointment_reason,
+                        "pending",
+                        datetime.now().isoformat(),
+                    ),
                 )
                 connection.commit()
 
             appointment_payload = {
                 "id": cursor.lastrowid,
                 "patient_id": patient_id,
-                "patient_name": patient_record.get("full_name") or patient_record.get("username") or f"Patient {patient_id}",
+                "patient_name": patient_name or patient_record.get("full_name") or patient_record.get("username") or f"Patient {patient_id}",
                 "doctor_id": doctor_id,
                 "doctor_name": doctor_record.get("full_name") or doctor_record.get("username") or f"Doctor {doctor_id}",
                 "doctor_specialization": _normalize_specialization(doctor_record.get("specialization")),
@@ -469,6 +595,10 @@ def create_appointment_blueprint(
                 "time": appointment_time,
                 "status": "pending",
                 "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+                "phone": patient_phone,
+                "age": patient_age,
+                "reason": appointment_reason,
             }
             _emit_appointment_update(resolved_db_path, appointment_payload)
 
@@ -493,22 +623,18 @@ def create_appointment_blueprint(
             if user_id != current_user_id:
                 return jsonify({"error": "Unauthorized appointment access."}), 403
 
-            _, patient_lookup, doctor_lookup = build_directory_maps()
-            query_field = "patient_id" if current_role == "patient" else "doctor_id"
-            with get_connection() as connection:
-                rows = connection.execute(
-                    f"""
-                    SELECT id, patient_id, doctor_id, date, time, status, created_at
-                    FROM appointments
-                    WHERE {query_field} = ?
-                    ORDER BY date ASC, time ASC, id DESC
-                    """,
-                    (user_id,),
-                ).fetchall()
+            appointments = _fetch_appointments_for_user(user_id, current_role)
+            return jsonify({"success": True, "appointments": appointments, "count": len(appointments)})
+        except Exception as exc:
+            return jsonify({"error": f"Failed to fetch appointments: {exc}"}), 500
 
-            appointments = [_serialize_appointment_row(row, patient_lookup, doctor_lookup) for row in rows]
-            appointments.sort(key=lambda item: (_safe_date_sort_key(item["date"]), _safe_time_sort_key(item["time"]), item["id"]))
-
+    @appointment_bp.route("/my_appointments", methods=["GET"])
+    @appointment_bp.route("/api/my_appointments", methods=["GET"])
+    @login_required_factory("patient")
+    def get_my_appointments():
+        try:
+            current_user_id = int(session.get("user_id"))
+            appointments = _fetch_appointments_for_user(current_user_id, "patient")
             return jsonify({"success": True, "appointments": appointments, "count": len(appointments)})
         except Exception as exc:
             return jsonify({"error": f"Failed to fetch appointments: {exc}"}), 500
@@ -530,10 +656,10 @@ def create_appointment_blueprint(
             current_user_id = int(session.get("user_id"))
             current_role = session.get("user_type")
 
-            with get_connection() as connection:
+            with closing(get_connection()) as connection:
                 appointment_row = connection.execute(
                     """
-                    SELECT id, patient_id, doctor_id, date, time, status, created_at
+                    SELECT id, patient_id, doctor_id, date, time, full_name, phone, age, reason, status, created_at, updated_at
                     FROM appointments
                     WHERE id = ?
                     """,
@@ -555,14 +681,14 @@ def create_appointment_blueprint(
                     return jsonify({"error": "Unsupported appointment update role."}), 403
 
                 connection.execute(
-                    "UPDATE appointments SET status = ? WHERE id = ?",
-                    (requested_status, appointment_id),
+                    "UPDATE appointments SET status = ?, updated_at = ? WHERE id = ?",
+                    (requested_status, datetime.now().isoformat(), appointment_id),
                 )
                 connection.commit()
 
                 updated_row = connection.execute(
                     """
-                    SELECT id, patient_id, doctor_id, date, time, status, created_at
+                    SELECT id, patient_id, doctor_id, date, time, full_name, phone, age, reason, status, created_at, updated_at
                     FROM appointments
                     WHERE id = ?
                     """,
@@ -576,5 +702,46 @@ def create_appointment_blueprint(
             return jsonify({"success": True, "appointment": appointment_payload})
         except Exception as exc:
             return jsonify({"error": f"Failed to update appointment: {exc}"}), 500
+
+    @appointment_bp.route("/doctor-appointments", methods=["GET"])
+    @appointment_bp.route("/api/doctor-appointments", methods=["GET"])
+    @login_required_factory("doctor")
+    def get_doctor_appointments():
+        try:
+            current_user_id = int(session.get("user_id"))
+            view_name, start_date, end_date = _resolve_calendar_window(
+                request.args.get("view", "week"),
+                request.args.get("start"),
+            )
+            _, patient_lookup, doctor_lookup = build_directory_maps()
+            with closing(get_connection()) as connection:
+                rows = connection.execute(
+                    """
+                    SELECT id, patient_id, doctor_id, date, time, full_name, phone, age, reason, status, created_at, updated_at
+                    FROM appointments
+                    WHERE doctor_id = ? AND date >= ? AND date <= ?
+                    ORDER BY date ASC, time ASC, id DESC
+                    """,
+                    (current_user_id, start_date.isoformat(), end_date.isoformat()),
+                ).fetchall()
+
+            appointments = [_serialize_appointment_row(row, patient_lookup, doctor_lookup) for row in rows]
+            calendar_days = _build_calendar_payload(appointments, start_date, end_date)
+
+            return jsonify(
+                {
+                    "success": True,
+                    "view": view_name,
+                    "start": start_date.isoformat(),
+                    "end": end_date.isoformat(),
+                    "appointments": appointments,
+                    "calendar": calendar_days,
+                    "count": len(appointments),
+                }
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            return jsonify({"error": f"Failed to fetch doctor appointments: {exc}"}), 500
 
     return appointment_bp

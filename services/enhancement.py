@@ -19,23 +19,30 @@ class ImageEnhancementService:
 
     def enhance(self, image: np.ndarray) -> Dict[str, object]:
         image = ensure_three_channel(image)
-        denoised = cv2.medianBlur(image, 3)
+        lightly_smoothed = cv2.GaussianBlur(image, (3, 3), 0.6)
 
-        lab_image = cv2.cvtColor(denoised, cv2.COLOR_BGR2LAB)
+        lab_image = cv2.cvtColor(lightly_smoothed, cv2.COLOR_BGR2LAB)
         lightness, channel_a, channel_b = cv2.split(lab_image)
         enhanced_lightness = self._clahe.apply(lightness)
         contrast_enhanced = cv2.merge((enhanced_lightness, channel_a, channel_b))
         contrast_enhanced = cv2.cvtColor(contrast_enhanced, cv2.COLOR_LAB2BGR)
 
-        blur_reference = cv2.GaussianBlur(contrast_enhanced, (0, 0), 1.0)
-        sharpened = cv2.addWeighted(contrast_enhanced, 1.45, blur_reference, -0.45, 0)
-        final_image = cv2.bilateralFilter(sharpened, 5, 35, 35)
+        sharpen_kernel = np.array(
+            [
+                [0.0, -1.0, 0.0],
+                [-1.0, 5.25, -1.0],
+                [0.0, -1.0, 0.0],
+            ],
+            dtype=np.float32,
+        )
+        sharpened = cv2.filter2D(contrast_enhanced, -1, sharpen_kernel)
+        final_image = np.clip(sharpened, 0, 255).astype(np.uint8)
 
         return {
             "original_image": image,
             "enhanced_image": final_image,
             "backend": "opencv",
-            "steps": ["median_filter", "clahe", "unsharp_mask", "bilateral_filter"],
+            "steps": ["gaussian_blur_light", "clahe", "sharpening_filter"],
         }
 
 
@@ -66,4 +73,3 @@ def save_analysis_assets(
         "output_dir": output_dir,
         "files": file_paths,
     }
-

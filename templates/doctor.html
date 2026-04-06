@@ -485,6 +485,88 @@
             box-shadow: 0 6px 18px rgba(0, 255, 200, 0.2);
         }
 
+        .clinical-insights-card {
+            border: 1px solid rgba(0, 214, 143, 0.24);
+            background: linear-gradient(135deg, rgba(0, 214, 143, 0.08), rgba(0, 149, 255, 0.08));
+        }
+
+        .ai-insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-top: 16px;
+        }
+
+        .insight-stat {
+            background: rgba(15, 15, 26, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 14px;
+            min-height: 116px;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+        }
+
+        .insight-label {
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+        }
+
+        .insight-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-light);
+            line-height: 1.35;
+        }
+
+        .insight-detail {
+            margin-top: 10px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .metric-pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .metric-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-light);
+            font-size: 0.78rem;
+        }
+
+        .segmentation-boundary-preview {
+            margin-top: 18px;
+            border-radius: 18px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 214, 143, 0.28);
+            background: rgba(8, 12, 22, 0.86);
+        }
+
+        .segmentation-boundary-preview img {
+            width: 100%;
+            display: block;
+        }
+
+        .segmentation-boundary-caption {
+            padding: 12px 14px;
+            color: var(--text-muted);
+            font-size: 0.84rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
         .glass-chat {
             position: fixed;
             bottom: 20px;
@@ -559,6 +641,170 @@
             cursor: pointer;
             color: #00110d;
             font-weight: bold;
+        }
+
+        #chatMessages.chat-thread {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 520px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .chat-thread-empty {
+            padding: 18px;
+            text-align: center;
+            color: var(--text-muted);
+            background: rgba(15, 15, 26, 0.5);
+            border: 1px dashed rgba(102, 126, 234, 0.28);
+            border-radius: 18px;
+        }
+
+        .chat-row {
+            display: flex;
+        }
+
+        .chat-row.self {
+            justify-content: flex-end;
+        }
+
+        .chat-bubble {
+            max-width: min(78%, 540px);
+            padding: 14px 16px;
+            border-radius: 20px 20px 20px 8px;
+            background: rgba(15, 15, 26, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+        }
+
+        .chat-row.self .chat-bubble {
+            background: linear-gradient(135deg, rgba(0, 214, 143, 0.2), rgba(0, 149, 255, 0.18));
+            border-color: rgba(0, 214, 143, 0.3);
+            border-radius: 20px 20px 8px 20px;
+        }
+
+        .chat-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.76rem;
+            color: var(--text-muted);
+        }
+
+        .chat-message-text {
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .chat-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            letter-spacing: 0.02em;
+            text-transform: capitalize;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .chat-status.sent {
+            color: #aab4d6;
+        }
+
+        .chat-status.delivered {
+            color: #7fd4ff;
+        }
+
+        .chat-status.seen {
+            color: #00d68f;
+        }
+
+        .chat-media {
+            margin-top: 12px;
+            border-radius: 14px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .chat-media img,
+        .chat-media video {
+            display: block;
+            width: 100%;
+            border-radius: 14px;
+        }
+
+        .chat-media audio {
+            width: 100%;
+            margin-top: 6px;
+        }
+
+        .calendar-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .calendar-view-buttons {
+            display: inline-flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .appointment-calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .appointment-day-card {
+            min-height: 160px;
+            padding: 14px;
+            border-radius: 18px;
+            border: 1px solid rgba(102, 126, 234, 0.24);
+            background: rgba(15, 15, 26, 0.72);
+        }
+
+        .appointment-day-card.today {
+            border-color: rgba(0, 214, 143, 0.45);
+            box-shadow: 0 12px 26px rgba(0, 214, 143, 0.12);
+        }
+
+        .appointment-day-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(102, 126, 234, 0.16);
+            color: #dce5ff;
+            font-size: 0.78rem;
+        }
+
+        .appointment-day-event {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .chat-user-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            background: rgba(0, 149, 255, 0.16);
+            color: #cce8ff;
         }
         
         /* Responsive */
@@ -919,6 +1165,8 @@
         let chatPartnerId = null;
         let currentChatUsers = [];
         let socket = null;
+        let doctorAppointmentView = 'week';
+        let doctorAppointmentStart = null;
         
         // Create floating particles
         function createParticles() {
@@ -1178,6 +1426,9 @@
                 const response = await fetch(`/api/doctor/report/${reportId}`);
                 const data = await response.json();
                 const report = data.report;
+                const detailedInfo = coerceObject(report.detailed_info);
+                const tumorDetails = resolveTumorDetails(report);
+                const modelAccuracy = resolveTumorMetricLabel(report, 'accuracy');
                 if (report.patient_id) {
                     await selectChatUser(report.patient_id);
                 }
@@ -1190,34 +1441,40 @@
                         <div class="col-md-6">
                             <div class="info-card">
                                 <h6><i class="fas fa-robot me-2"></i>AI Analysis Results</h6>
-                                <p><strong>Patient:</strong> ${report.patient_name}</p>
-                                <p><strong>Type:</strong> ${report.type === 'brain' ? 'Brain Tumor' : "Alzheimer's"}</p>
-                                <p><strong>AI Result:</strong> ${report.result}</p>
-                                <p><strong>Tumor Confidence:</strong> ${renderConfidenceBadge(report.analysis?.tumor?.confidence ?? report.tumor_confidence)}</p>
+                                <p><strong>Patient:</strong> ${escapeHtml(report.patient_name || 'Unknown')}</p>
+                                <p><strong>Type:</strong> ${escapeHtml(report.type === 'brain' ? 'Brain Tumor' : "Alzheimer's")}</p>
+                                <p><strong>AI Result:</strong> ${escapeHtml(report.result || 'Unavailable')}</p>
+                                <p><strong>Tumor Type:</strong> ${escapeHtml(tumorDetails.type || 'N/A')}</p>
+                                <p><strong>Tumor Stage:</strong> ${escapeHtml(tumorDetails.stage || 'N/A')}</p>
+                                <p><strong>Tumor Confidence:</strong> ${renderConfidenceBadge(tumorDetails.confidence ?? report.tumor_confidence)}</p>
+                                <p><strong>Alzheimer Stage:</strong> ${escapeHtml(report.analysis?.alzheimers?.stage || report.alzheimer_stage || report.alz_stage || 'N/A')}</p>
+                                <p><strong>Model Accuracy:</strong> ${renderConfidenceBadge(modelAccuracy)}</p>
                                 <p><strong>Alzheimer Confidence:</strong> ${renderConfidenceBadge(report.analysis?.alzheimers?.confidence ?? report.alzheimer_confidence)}</p>
-                                <p><strong>Date:</strong> ${new Date(report.date).toLocaleString()}</p>
-                                ${report.patient_age ? `<p><strong>Age:</strong> ${report.patient_age}</p>` : ''}
-                                ${report.patient_gender ? `<p><strong>Gender:</strong> ${report.patient_gender}</p>` : ''}
+                                <p><strong>Date:</strong> ${escapeHtml(new Date(report.date).toLocaleString())}</p>
+                                ${report.patient_age ? `<p><strong>Age:</strong> ${escapeHtml(report.patient_age)}</p>` : ''}
+                                ${report.patient_gender ? `<p><strong>Gender:</strong> ${escapeHtml(report.patient_gender)}</p>` : ''}
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="info-card">
                                 <h6><i class="fas fa-notes-medical me-2"></i>Patient Information</h6>
-                                <p><strong>Symptoms:</strong> ${report.symptoms || 'None reported'}</p>
-                                <p><strong>Additional Notes:</strong> ${report.notes || 'None'}</p>
+                                <p><strong>Symptoms:</strong> ${escapeHtml(report.symptoms || 'None reported')}</p>
+                                <p><strong>Additional Notes:</strong> ${escapeHtml(report.notes || 'None')}</p>
                             </div>
                         </div>
                     </div>
+
+                    ${renderAiClinicalInsights(report)}
                     
                     <div class="info-card">
                         <h6><i class="fas fa-info-circle me-2"></i>AI Detailed Analysis</h6>
-                        <p><strong>Description:</strong> ${report.detailed_info.description}</p>
-                        <p><strong>Common Symptoms:</strong> ${report.detailed_info.symptoms}</p>
-                        <p><strong>Suggested Treatment:</strong> ${report.detailed_info.treatment}</p>
-                        <p><strong>Risk Factors:</strong> ${report.detailed_info.risk_factors}</p>
-                        <p><strong>Prevention:</strong> ${report.detailed_info.prevention}</p>
-                        <p><strong>Severity:</strong> ${report.detailed_info.severity}</p>
-                        <p><strong>Urgency:</strong> ${report.detailed_info.urgency}</p>
+                        <p><strong>Description:</strong> ${escapeHtml(detailedInfo.description || 'Not available')}</p>
+                        <p><strong>Common Symptoms:</strong> ${escapeHtml(detailedInfo.symptoms || 'Not available')}</p>
+                        <p><strong>Suggested Treatment:</strong> ${escapeHtml(detailedInfo.treatment || 'Not available')}</p>
+                        <p><strong>Risk Factors:</strong> ${escapeHtml(detailedInfo.risk_factors || 'Not available')}</p>
+                        <p><strong>Prevention:</strong> ${escapeHtml(detailedInfo.prevention || 'Not available')}</p>
+                        <p><strong>Severity:</strong> ${escapeHtml(detailedInfo.severity || 'Not available')}</p>
+                        <p><strong>Urgency:</strong> ${escapeHtml(detailedInfo.urgency || 'Not available')}</p>
                     </div>
                     
                     ${renderReportImageGallery(report)}
@@ -1399,6 +1656,125 @@
             return `<span class="confidence-badge">${formatConfidence(value)}</span>`;
         }
 
+        function coerceObject(value) {
+            return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+        }
+
+        function firstNonEmptyObject(...values) {
+            for (const value of values) {
+                const candidate = coerceObject(value);
+                if (Object.keys(candidate).length) {
+                    return candidate;
+                }
+            }
+            return {};
+        }
+
+        function resolveTumorDetails(report) {
+            const analysis = coerceObject(report.analysis);
+            const tumor = coerceObject(analysis.tumor);
+            const reportMetrics = coerceObject(report.model_metrics);
+            const analysisMetrics = coerceObject(analysis.model_metrics);
+            const tumorMetrics = firstNonEmptyObject(tumor.model_metrics, analysisMetrics.tumor, reportMetrics.tumor);
+
+            return {
+                detected: Boolean(tumor.detected ?? report.tumor_detected),
+                type: tumor.tumor_type || tumor.classification || report.tumor_type || report.result || 'N/A',
+                stage: tumor.tumor_stage || tumor.grade || report.tumor_stage || report.tumor_grade || 'N/A',
+                confidence: tumor.confidence ?? report.tumor_confidence,
+                typeConfidence: tumor.type_confidence,
+                stageConfidence: tumor.stage_confidence,
+                volume: tumor.volume_mm3 ?? report.tumor_volume_mm3,
+                metrics: tumorMetrics
+            };
+        }
+
+        function resolveTumorMetricLabel(report, metricKey) {
+            const tumorDetails = resolveTumorDetails(report);
+            const metrics = coerceObject(tumorDetails.metrics);
+            const labelKey = `${metricKey}_label`;
+            const reportValue = metricKey === 'accuracy' ? report.model_accuracy : null;
+            if (metrics[labelKey]) {
+                return metrics[labelKey];
+            }
+            if (Number.isFinite(Number(metrics[metricKey]))) {
+                return formatConfidence(metrics[metricKey]);
+            }
+            return (metricKey === 'accuracy' ? reportValue : null) || 'N/A';
+        }
+
+        function renderInsightStat(label, value, detail = '') {
+            return `
+                <div class="insight-stat">
+                    <div class="insight-label">${escapeHtml(label)}</div>
+                    <div class="insight-value">${escapeHtml(value || 'N/A')}</div>
+                    ${detail ? `<div class="insight-detail">${escapeHtml(detail)}</div>` : ''}
+                </div>
+            `;
+        }
+
+        function renderMetricPill(label, value) {
+            if (!value || value === 'N/A') {
+                return '';
+            }
+            return `<span class="metric-pill"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</span>`;
+        }
+
+        function renderAiClinicalInsights(report) {
+            const analysis = coerceObject(report.analysis);
+            const insights = firstNonEmptyObject(report.ai_clinical_insights, analysis.ai_clinical_insights);
+            const segmentation = coerceObject(analysis.segmentation);
+            const reportImages = coerceObject(report.report_images);
+            const tumorDetails = resolveTumorDetails(report);
+            const modelAccuracy = resolveTumorMetricLabel(report, 'accuracy');
+            const precision = resolveTumorMetricLabel(report, 'precision');
+            const recall = resolveTumorMetricLabel(report, 'recall');
+            const f1Score = resolveTumorMetricLabel(report, 'f1_score');
+            const alzheimerStage = report.analysis?.alzheimers?.stage || report.alzheimer_stage || report.alz_stage || 'N/A';
+            const contourCount = segmentation.contour_count || 0;
+            const maskQuality = insights.mask_quality || segmentation.mask_quality || 'Unavailable';
+            const overlaySource = resolveImageSource(
+                reportImages.segmentation_overlay || report.segmentation_overlay || report.segmentation_image
+            );
+            const volumeLabel = tumorDetails.volume ? `${tumorDetails.volume} mm3` : '0 mm3';
+            const confidenceDetail = tumorDetails.detected
+                ? `Type ${formatConfidence(tumorDetails.typeConfidence || tumorDetails.confidence)} | Stage ${formatConfidence(tumorDetails.stageConfidence || tumorDetails.confidence)}`
+                : 'No abnormal lesion pattern detected';
+            const boundaryDetail = contourCount
+                ? `${contourCount} contour${contourCount === 1 ? '' : 's'} drawn on the original MRI`
+                : 'Boundary overlay unavailable';
+
+            return `
+                <div class="info-card clinical-insights-card">
+                    <h6><i class="fas fa-brain me-2"></i>AI Clinical Insights</h6>
+                    <div class="ai-insights-grid">
+                        ${renderInsightStat('Tumor Type', tumorDetails.type || 'N/A', tumorDetails.detected ? 'Primary lesion classification' : 'No tumor signature detected')}
+                        ${renderInsightStat('Tumor Stage', tumorDetails.stage || 'N/A', tumorDetails.detected ? 'WHO Grade I-IV estimate' : 'Staging not applicable')}
+                        ${renderInsightStat('Alzheimer Stage', alzheimerStage, 'Neurocognitive staging output from the classifier')}
+                        ${renderInsightStat('Tumor Confidence', formatConfidence(tumorDetails.confidence), confidenceDetail)}
+                        ${renderInsightStat('Model Accuracy', modelAccuracy, precision !== 'N/A' || recall !== 'N/A' || f1Score !== 'N/A' ? `Precision ${precision} | Recall ${recall} | F1 ${f1Score}` : 'Training metrics will appear after evaluation')}
+                        ${renderInsightStat('Tumor Volume', volumeLabel, `Mask quality: ${maskQuality}`)}
+                        ${renderInsightStat('Boundary Overlay', contourCount ? `${contourCount} detected` : 'Unavailable', boundaryDetail)}
+                    </div>
+                    <div class="metric-pill-row">
+                        ${renderMetricPill('Precision', precision)}
+                        ${renderMetricPill('Recall', recall)}
+                        ${renderMetricPill('F1 Score', f1Score)}
+                        ${renderMetricPill('Mask Quality', maskQuality)}
+                        ${renderMetricPill('Boundary', insights.segmentation_boundary || (contourCount ? 'Detected' : 'Unavailable'))}
+                    </div>
+                    ${overlaySource ? `
+                        <div class="segmentation-boundary-preview">
+                            <img src="${overlaySource}" alt="Segmentation boundary overlay">
+                            <div class="segmentation-boundary-caption">
+                                Segmentation overlay with tumor boundary highlighted on the original MRI for clinical review.
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
         function escapeHtml(value) {
             return String(value || '')
                 .replace(/&/g, '&amp;')
@@ -1447,7 +1823,7 @@
                 {label: 'Input Image', value: reportImages.input_image || report.input_image || report.image},
                 {label: 'Original MRI', value: reportImages.original_mri || report.original_mri || report.original_image},
                 {label: 'Enhanced MRI', value: reportImages.enhanced_mri || report.enhanced_mri || report.enhanced_image},
-                {label: 'Segmentation Overlay', value: reportImages.segmentation_overlay || report.segmentation_overlay || report.segmentation_image},
+                {label: 'Segmentation Overlay (Boundary)', value: reportImages.segmentation_overlay || report.segmentation_overlay || report.segmentation_image},
                 {label: 'Segmentation Mask', value: reportImages.segmentation_mask || report.segmentation_mask}
             ].filter((entry) => entry.value);
 
@@ -1503,10 +1879,31 @@
                     (data.sender_id === currentUserId && data.receiver_id === chatPartnerId) ||
                     (data.sender_id === chatPartnerId && data.receiver_id === currentUserId);
 
+                if (data.sender_id !== currentUserId) {
+                    showAlert('New patient message received.', 'info');
+                }
                 loadChatUsers();
                 if (isConversationMessage) {
                     loadMessages();
                 }
+            });
+            socket.on('message_status', (data) => {
+                const currentUserId = getCurrentChatUserId();
+                if (!currentUserId) {
+                    return;
+                }
+                const isRelevantStatus = data.sender_id === currentUserId || data.receiver_id === currentUserId;
+                if (!isRelevantStatus) {
+                    return;
+                }
+                if (
+                    chatPartnerId &&
+                    ((data.sender_id === currentUserId && data.receiver_id === chatPartnerId) ||
+                    (data.sender_id === chatPartnerId && data.receiver_id === currentUserId))
+                ) {
+                    loadMessages();
+                }
+                loadChatUsers();
             });
             socket.on('appointment_updated', (data) => {
                 const currentUserId = getCurrentChatUserId();
@@ -1515,8 +1912,57 @@
                 }
                 if (data.patient_id === currentUserId || data.doctor_id === currentUserId) {
                     loadAppointments();
+                    const normalizedStatus = String(data.status || '').toLowerCase();
+                    if (normalizedStatus === 'pending') {
+                        showAlert('A new appointment request was received.', 'info');
+                    }
                 }
             });
+            socket.on('scan_uploaded', (data) => {
+                const currentUserId = getCurrentChatUserId();
+                if (data.doctor_id && currentUserId && data.doctor_id !== currentUserId) {
+                    return;
+                }
+                loadPendingReports();
+                loadPatients();
+                loadStats();
+                showAlert('A new scan is ready for review.', 'success');
+            });
+            socket.on('report_status_updated', (data) => {
+                const currentUserId = getCurrentChatUserId();
+                if (data.doctor_id && currentUserId && data.doctor_id !== currentUserId) {
+                    return;
+                }
+                loadPendingReports();
+                loadPatients();
+                loadStats();
+            });
+        }
+
+        function formatChatTimestamp(timestamp) {
+            const parsedTimestamp = new Date(timestamp);
+            if (Number.isNaN(parsedTimestamp.getTime())) {
+                return timestamp || '';
+            }
+            return parsedTimestamp.toLocaleString();
+        }
+
+        function formatMessageStatusLabel(status) {
+            const normalizedStatus = String(status || 'sent').toLowerCase();
+            if (normalizedStatus === 'seen') {
+                return 'Seen';
+            }
+            if (normalizedStatus === 'delivered') {
+                return 'Delivered';
+            }
+            return 'Sent';
+        }
+
+        function scrollChatToBottom() {
+            const box = document.getElementById('chatMessages');
+            if (box) {
+                box.scrollTop = box.scrollHeight;
+            }
         }
 
         function renderMediaMarkup(message) {
@@ -1525,15 +1971,15 @@
             }
             const safeUrl = escapeHtml(message.file_url);
             if (message.type === 'image') {
-                return `<img src="${safeUrl}" alt="Shared image" class="img-fluid rounded mt-2">`;
+                return `<div class="chat-media"><img src="${safeUrl}" alt="Shared image"></div>`;
             }
             if (message.type === 'video') {
-                return `<video controls class="w-100 rounded mt-2"><source src="${safeUrl}"></video>`;
+                return `<div class="chat-media"><video controls><source src="${safeUrl}"></video></div>`;
             }
             if (message.type === 'audio') {
-                return `<audio controls class="w-100 mt-2"><source src="${safeUrl}"></audio>`;
+                return `<div class="chat-media"><audio controls><source src="${safeUrl}"></audio></div>`;
             }
-            return `<a href="${safeUrl}" target="_blank" class="btn btn-primary mt-2">Open Media</a>`;
+            return `<div class="chat-media p-3"><a href="${safeUrl}" target="_blank" class="btn btn-primary">Open Media</a></div>`;
         }
 
         function renderMessages(messages) {
@@ -1544,27 +1990,36 @@
             }
 
             if (!messages.length) {
-                box.innerHTML = '<div class="info-card text-muted">No messages yet. Select a patient and start the conversation.</div>';
+                box.className = 'chat-thread';
+                box.innerHTML = '<div class="chat-thread-empty">No messages yet. Select a patient and start the conversation.</div>';
                 return;
             }
 
+            box.className = 'chat-thread';
             box.innerHTML = messages.map((message) => {
                 const isSelf = message.sender_id === currentUserId;
                 const senderLabel = escapeHtml(message.sender_name || (isSelf ? 'You' : 'Patient'));
-                const messageText = message.message ? `<p class="mb-0 mt-2">${escapeHtml(message.message)}</p>` : '';
+                const messageText = message.message ? `<div class="chat-message-text">${escapeHtml(message.message)}</div>` : '';
+                const messageStatus = isSelf ? `
+                    <span class="chat-status ${escapeHtml(String(message.status || 'sent').toLowerCase())}">
+                        <i class="fas fa-check-double"></i>${escapeHtml(formatMessageStatusLabel(message.status))}
+                    </span>
+                ` : '';
                 return `
-                    <div class="${isSelf ? 'text-end' : ''}">
-                        <div class="info-card">
-                            <div class="d-flex justify-content-between ${isSelf ? 'flex-row-reverse' : ''}">
+                    <div class="chat-row ${isSelf ? 'self' : ''}">
+                        <div class="chat-bubble">
+                            <div class="chat-meta">
                                 <strong>${senderLabel}</strong>
-                                <small class="text-muted">${new Date(message.timestamp).toLocaleString()}</small>
+                                <span>${escapeHtml(formatChatTimestamp(message.timestamp))}</span>
                             </div>
                             ${messageText}
                             ${renderMediaMarkup(message)}
+                            ${messageStatus ? `<div class="mt-3 text-end">${messageStatus}</div>` : ''}
                         </div>
                     </div>
                 `;
             }).join('');
+            scrollChatToBottom();
         }
 
         function renderChatUsers(users) {
@@ -1588,9 +2043,12 @@
                                 ${user.last_message_at ? `Last message: ${new Date(user.last_message_at).toLocaleString()}` : 'No messages yet'}
                             </small>
                         </div>
-                        <span class="status-badge ${chatPartnerId === user.id ? 'status-approved' : 'status-reviewed'}">
-                            ${chatPartnerId === user.id ? 'Open' : `${user.message_count || 0} Msg`}
-                        </span>
+                        <div class="d-flex flex-column align-items-end gap-2">
+                            <span class="status-badge ${chatPartnerId === user.id ? 'status-approved' : 'status-reviewed'}">
+                                ${chatPartnerId === user.id ? 'Open' : `${user.message_count || 0} Msg`}
+                            </span>
+                            ${user.unread_count ? `<span class="chat-user-count"><i class="fas fa-bell"></i>${escapeHtml(String(user.unread_count))} unread</span>` : ''}
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -1611,7 +2069,8 @@
             summaryBox.innerHTML = `
                 <p><strong>${escapeHtml(selectedPartner.full_name || selectedPartner.username || `Patient ${selectedPartner.id}`)}</strong></p>
                 <p class="mb-1 text-muted">${escapeHtml(selectedPartner.email || 'No email available')}</p>
-                <p class="mb-0 text-muted">Messages: ${selectedPartner.message_count || 0}</p>
+                <p class="mb-1 text-muted">Messages: ${selectedPartner.message_count || 0}</p>
+                <p class="mb-0 text-muted">${selectedPartner.unread_count ? `${escapeHtml(String(selectedPartner.unread_count))} unread message(s)` : 'Conversation synced in realtime'}</p>
             `;
         }
 
@@ -1773,11 +2232,97 @@
                 renderMessages([]);
                 return;
             }
+            try {
+                const response = await fetch(`/chat/history/${chatPartnerId}?limit=200`);
+                const data = await response.json();
+                const messages = Array.isArray(data) ? data : (data.messages || []);
+                renderMessages(messages);
+            } catch (error) {
+                renderMessages([]);
+                showAlert('Unable to load chat history.', 'danger');
+            }
+        }
 
-            const response = await fetch(`/chat/history/${chatPartnerId}`);
-            const data = await response.json();
-            const messages = Array.isArray(data) ? data : (data.messages || []);
-            renderMessages(messages);
+        function formatDoctorCalendarRange(start, end, view) {
+            const startDate = new Date(`${start}T00:00:00`);
+            const endDate = new Date(`${end}T00:00:00`);
+            if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+                return '';
+            }
+            if (view === 'month') {
+                return startDate.toLocaleDateString(undefined, {month: 'long', year: 'numeric'});
+            }
+            return `${startDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} - ${endDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}`;
+        }
+
+        function setDoctorAppointmentView(view) {
+            doctorAppointmentView = view === 'month' ? 'month' : 'week';
+            doctorAppointmentStart = null;
+            loadAppointments();
+        }
+
+        function shiftDoctorAppointmentWindow(direction) {
+            const anchor = doctorAppointmentStart ? new Date(`${doctorAppointmentStart}T00:00:00`) : new Date();
+            if (Number.isNaN(anchor.getTime())) {
+                return;
+            }
+            if (doctorAppointmentView === 'month') {
+                anchor.setMonth(anchor.getMonth() + direction, 1);
+                anchor.setDate(1);
+            } else {
+                anchor.setDate(anchor.getDate() + (direction * 7));
+            }
+            doctorAppointmentStart = anchor.toISOString().slice(0, 10);
+            loadAppointments();
+        }
+
+        function renderAppointmentCalendar(calendarData, view, start, end) {
+            const calendarDays = Array.isArray(calendarData) ? calendarData : [];
+            return `
+                <div class="calendar-toolbar">
+                    <div>
+                        <h6 class="mb-1"><i class="fas fa-calendar-alt me-2"></i>${escapeHtml(formatDoctorCalendarRange(start, end, view))}</h6>
+                        <p class="mb-0 text-muted">Live booking calendar for your consultations.</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="calendar-view-buttons">
+                            <button class="btn ${view === 'week' ? 'btn-primary' : 'btn-secondary'} btn-sm" type="button" onclick="setDoctorAppointmentView('week')">Week</button>
+                            <button class="btn ${view === 'month' ? 'btn-primary' : 'btn-secondary'} btn-sm" type="button" onclick="setDoctorAppointmentView('month')">Month</button>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="shiftDoctorAppointmentWindow(-1)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="shiftDoctorAppointmentWindow(1)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="appointment-calendar-grid">
+                    ${calendarDays.map((day) => {
+                        const isToday = day.date === new Date().toISOString().slice(0, 10);
+                        const dayEvents = Array.isArray(day.appointments) ? day.appointments : [];
+                        return `
+                            <div class="appointment-day-card ${isToday ? 'today' : ''}">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div>
+                                        <div class="fw-bold">${escapeHtml(day.day || '')}</div>
+                                        <div class="fs-4 fw-bold">${escapeHtml(String(day.day_number || ''))}</div>
+                                        <div class="text-muted">${escapeHtml(day.month || '')}</div>
+                                    </div>
+                                    <span class="appointment-day-count">${escapeHtml(String(day.appointment_count || 0))} booked</span>
+                                </div>
+                                ${dayEvents.length ? dayEvents.map((appointment) => `
+                                    <div class="appointment-day-event">
+                                        <div class="fw-bold">${escapeHtml(appointment.time || '')}</div>
+                                        <div>${escapeHtml(appointment.patient_name || `Patient ${appointment.patient_id}`)}</div>
+                                        <div class="text-muted small">${escapeHtml(formatStatusLabel(appointment.status))}</div>
+                                    </div>
+                                `).join('') : '<div class="text-muted small mt-3">No bookings</div>'}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
         }
 
         function renderAppointmentActions(appointment) {
@@ -1809,30 +2354,32 @@
             return '';
         }
 
-        function renderAppointments(appointments) {
+        function renderAppointments(appointments, calendarPayload = null) {
             const container = document.getElementById('appointmentsList');
             if (!container) {
                 return;
             }
 
-            if (!appointments.length) {
-                container.innerHTML = '<div class="info-card text-muted">No appointments scheduled yet.</div>';
-                return;
-            }
-
-            container.innerHTML = appointments.map((appointment) => `
+            const calendarHtml = calendarPayload
+                ? renderAppointmentCalendar(calendarPayload.calendar, calendarPayload.view, calendarPayload.start, calendarPayload.end)
+                : '';
+            const listHtml = appointments.length ? appointments.map((appointment) => `
                 <div class="info-card">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <p class="mb-1"><strong>Patient:</strong> ${escapeHtml(appointment.patient_name || `Patient ${appointment.patient_id}`)}</p>
                             <p class="mb-1"><strong>Date:</strong> ${escapeHtml(appointment.date)}</p>
-                            <p class="mb-0"><strong>Time:</strong> ${escapeHtml(appointment.time)}</p>
+                            <p class="mb-1"><strong>Time:</strong> ${escapeHtml(appointment.time)}</p>
+                            ${appointment.phone ? `<p class="mb-1 text-muted"><strong>Phone:</strong> ${escapeHtml(appointment.phone)}</p>` : ''}
+                            ${appointment.reason ? `<p class="mb-0 text-muted"><strong>Reason:</strong> ${escapeHtml(appointment.reason)}</p>` : ''}
                         </div>
                         <span class="status-badge status-${getStatusClass(appointment.status)}">${escapeHtml(formatStatusLabel(appointment.status))}</span>
                     </div>
                     ${renderAppointmentActions(appointment)}
                 </div>
-            `).join('');
+            `).join('') : '<div class="info-card text-muted">No appointments scheduled in this window.</div>';
+
+            container.innerHTML = `${calendarHtml}${listHtml}`;
         }
 
         async function loadAppointments() {
@@ -1842,11 +2389,25 @@
             }
 
             try {
-                const response = await fetch(`/get_appointments/${currentUserId}`);
+                const params = new URLSearchParams({view: doctorAppointmentView});
+                if (doctorAppointmentStart) {
+                    params.set('start', doctorAppointmentStart);
+                }
+                const response = await fetch(`/api/doctor-appointments?${params.toString()}`);
                 const data = await response.json();
-                renderAppointments(data.appointments || []);
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Unable to load appointments');
+                }
+                doctorAppointmentView = data.view || doctorAppointmentView;
+                doctorAppointmentStart = data.start || doctorAppointmentStart;
+                renderAppointments(data.appointments || [], data);
             } catch (error) {
-                renderAppointments([]);
+                renderAppointments([], {
+                    view: doctorAppointmentView,
+                    start: doctorAppointmentStart || new Date().toISOString().slice(0, 10),
+                    end: doctorAppointmentStart || new Date().toISOString().slice(0, 10),
+                    calendar: []
+                });
             }
         }
 

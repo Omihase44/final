@@ -113,8 +113,16 @@ def get_allowed_chat_user_ids(users: Dict[str, list], current_role: str, current
     return patient_ids or None
 
 
-def get_socket_room(user_id: int) -> str:
+def get_socket_room(user_id: int, role: Optional[str] = None) -> str:
+    normalized_role = str(role or "").strip().lower()
+    if normalized_role:
+        return f"user_{normalized_role}_{int(user_id)}"
     return f"user_{int(user_id)}"
+
+
+def build_conversation_key(left_user_id: int, right_user_id: int) -> str:
+    first_id, second_id = sorted((int(left_user_id), int(right_user_id)))
+    return f"{first_id}:{second_id}"
 
 
 def build_chat_payload(
@@ -129,6 +137,10 @@ def build_chat_payload(
     receiver_name: Optional[str] = None,
     file_url: Optional[str] = None,
     message_type: str = "text",
+    status: str = "sent",
+    delivered_at: Optional[str] = None,
+    seen_at: Optional[str] = None,
+    conversation_key: Optional[str] = None,
 ) -> dict:
     return {
         "id": int(message_id),
@@ -142,4 +154,8 @@ def build_chat_payload(
         "file_url": file_url,
         "type": normalize_message_type(message_type),
         "timestamp": timestamp,
+        "status": str(status or "sent").strip().lower(),
+        "delivered_at": delivered_at,
+        "seen_at": seen_at,
+        "conversation_key": conversation_key or build_conversation_key(sender_id, receiver_id),
     }

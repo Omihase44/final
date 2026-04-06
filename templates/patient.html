@@ -558,6 +558,164 @@
             border-radius: 8px;
             cursor: pointer;
         }
+
+        #chatMessages.chat-thread {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 520px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .chat-thread-empty {
+            padding: 18px;
+            text-align: center;
+            color: var(--text-muted);
+            background: rgba(15, 15, 26, 0.5);
+            border: 1px dashed rgba(102, 126, 234, 0.28);
+            border-radius: 18px;
+        }
+
+        .chat-row {
+            display: flex;
+        }
+
+        .chat-row.self {
+            justify-content: flex-end;
+        }
+
+        .chat-bubble {
+            max-width: min(78%, 540px);
+            padding: 14px 16px;
+            border-radius: 20px 20px 20px 8px;
+            background: rgba(15, 15, 26, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+        }
+
+        .chat-row.self .chat-bubble {
+            background: linear-gradient(135deg, rgba(0, 214, 143, 0.2), rgba(0, 149, 255, 0.18));
+            border-color: rgba(0, 214, 143, 0.3);
+            border-radius: 20px 20px 8px 20px;
+        }
+
+        .chat-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.76rem;
+            color: var(--text-muted);
+        }
+
+        .chat-message-text {
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .chat-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            letter-spacing: 0.02em;
+            text-transform: capitalize;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .chat-status.sent {
+            color: #aab4d6;
+        }
+
+        .chat-status.delivered {
+            color: #7fd4ff;
+        }
+
+        .chat-status.seen {
+            color: #00d68f;
+        }
+
+        .chat-media {
+            margin-top: 12px;
+            border-radius: 14px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .chat-media img,
+        .chat-media video {
+            display: block;
+            width: 100%;
+            border-radius: 14px;
+        }
+
+        .chat-media audio {
+            width: 100%;
+            margin-top: 6px;
+        }
+
+        .appointment-date-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+            gap: 12px;
+        }
+
+        .appointment-date-card {
+            padding: 14px 12px;
+            border-radius: 18px;
+            border: 1px solid rgba(102, 126, 234, 0.24);
+            background: rgba(15, 15, 26, 0.72);
+            color: var(--text-light);
+            text-align: left;
+            transition: all 0.25s ease;
+        }
+
+        .appointment-date-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .appointment-date-card.active {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.25), rgba(0, 214, 143, 0.18));
+            border-color: rgba(0, 214, 143, 0.45);
+            box-shadow: 0 12px 26px rgba(0, 214, 143, 0.16);
+        }
+
+        .appointment-date-card:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .time-chip-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .time-chip {
+            border: 1px solid rgba(102, 126, 234, 0.24);
+            background: rgba(15, 15, 26, 0.72);
+            color: var(--text-light);
+            padding: 10px 14px;
+            border-radius: 999px;
+            transition: all 0.25s ease;
+        }
+
+        .time-chip:hover {
+            transform: translateY(-2px);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .time-chip.active {
+            background: linear-gradient(135deg, rgba(0, 214, 143, 0.22), rgba(0, 149, 255, 0.16));
+            border-color: rgba(0, 214, 143, 0.45);
+            color: #dffcf0;
+        }
         
         /* Responsive */
         @media (max-width: 768px) {
@@ -1116,11 +1274,35 @@
             return statusMap[status] || status;
         }
         
+        function getPatientReportTumorDetails(report) {
+            const tumor = report.analysis?.tumor || {};
+            return {
+                type: tumor.tumor_type || tumor.classification || report.tumor_type || report.result || 'N/A',
+                stage: tumor.tumor_stage || tumor.grade || report.tumor_stage || report.tumor_grade || 'N/A',
+                confidence: tumor.confidence ?? report.tumor_confidence
+            };
+        }
+
+        function getPatientReportAlzheimerStage(report) {
+            return report.analysis?.alzheimers?.stage || report.alzheimer_stage || report.alz_stage || 'N/A';
+        }
+
+        function getPatientReportModelAccuracy(report) {
+            return report.model_accuracy
+                || report.analysis?.model_accuracy
+                || report.analysis?.tumor?.model_metrics?.accuracy_label
+                || report.model_metrics?.tumor?.accuracy_label
+                || 'Unavailable';
+        }
+
         async function viewReport(reportId) {
             try {
                 const response = await fetch(`/api/patient/report/${reportId}`);
                 const data = await response.json();
                 const report = data.report;
+                const tumorDetails = getPatientReportTumorDetails(report);
+                const alzheimerStage = getPatientReportAlzheimerStage(report);
+                const modelAccuracy = getPatientReportModelAccuracy(report);
                 
                 const modal = new bootstrap.Modal(document.getElementById('reportModal'));
                 const content = document.getElementById('reportModalContent');
@@ -1129,9 +1311,13 @@
                     <div class="info-card">
                         <h6><i class="fas fa-robot me-2"></i>AI Analysis Results</h6>
                         <p><strong>Detection Type:</strong> ${report.type === 'brain' ? 'Brain Tumor' : "Alzheimer's"}</p>
-                        <p><strong>Result:</strong> ${report.result}</p>
-                        <p><strong>Tumor Confidence:</strong> ${renderConfidenceBadge(report.analysis?.tumor?.confidence ?? report.tumor_confidence)}</p>
+                        <p><strong>Result:</strong> ${escapeHtml(report.result || 'Unavailable')}</p>
+                        <p><strong>Tumor Type:</strong> ${escapeHtml(tumorDetails.type)}</p>
+                        <p><strong>Tumor Stage:</strong> ${escapeHtml(tumorDetails.stage)}</p>
+                        <p><strong>Tumor Confidence:</strong> ${renderConfidenceBadge(tumorDetails.confidence)}</p>
+                        <p><strong>Alzheimer Stage:</strong> ${escapeHtml(alzheimerStage)}</p>
                         <p><strong>Alzheimer Confidence:</strong> ${renderConfidenceBadge(report.analysis?.alzheimers?.confidence ?? report.alzheimer_confidence)}</p>
+                        <p><strong>Model Accuracy:</strong> ${renderConfidenceBadge(modelAccuracy)}</p>
                         <p><strong>Date:</strong> ${new Date(report.date).toLocaleString()}</p>
                         ${report.patient_age ? `<p><strong>Age:</strong> ${report.patient_age}</p>` : ''}
                         ${report.patient_gender ? `<p><strong>Gender:</strong> ${report.patient_gender}</p>` : ''}
@@ -1270,14 +1456,42 @@
                 }
             });
             socket.on('receive_message', (data) => {
-                if (!chatPartnerId) {
+                const currentUserId = getCurrentChatUserId();
+                if (!currentUserId) {
                     return;
                 }
-                const currentUserId = getCurrentChatUserId();
+                const isRelevantMessage = data.sender_id === currentUserId || data.receiver_id === currentUserId;
+                if (!isRelevantMessage) {
+                    return;
+                }
+                if (!chatPartnerId && data.sender_id !== currentUserId) {
+                    chatPartnerId = data.sender_id;
+                }
                 const isConversationMessage =
                     (data.sender_id === currentUserId && data.receiver_id === chatPartnerId) ||
                     (data.sender_id === chatPartnerId && data.receiver_id === currentUserId);
+                if (data.sender_id !== currentUserId) {
+                    showAlert('New message received from your doctor.', 'info');
+                }
                 if (isConversationMessage) {
+                    loadMessages();
+                }
+                loadChatPartner();
+            });
+            socket.on('message_status', (data) => {
+                const currentUserId = getCurrentChatUserId();
+                if (!currentUserId) {
+                    return;
+                }
+                const isRelevantStatus = data.sender_id === currentUserId || data.receiver_id === currentUserId;
+                if (!isRelevantStatus) {
+                    return;
+                }
+                if (
+                    chatPartnerId &&
+                    ((data.sender_id === currentUserId && data.receiver_id === chatPartnerId) ||
+                    (data.sender_id === chatPartnerId && data.receiver_id === currentUserId))
+                ) {
                     loadMessages();
                 }
                 loadChatPartner();
@@ -1291,8 +1505,57 @@
                     data.patient_id === currentUserId || data.doctor_id === currentUserId;
                 if (isRelevantAppointment) {
                     loadAppointments();
+                    const normalizedStatus = String(data.status || '').toLowerCase();
+                    if (normalizedStatus === 'confirmed') {
+                        showAlert('Your appointment has been confirmed.', 'success');
+                    } else if (normalizedStatus === 'completed') {
+                        showAlert('Your appointment has been marked as completed.', 'info');
+                    } else if (normalizedStatus === 'cancelled') {
+                        showAlert('An appointment was cancelled.', 'warning');
+                    }
                 }
             });
+            socket.on('report_status_updated', (data) => {
+                const currentUserId = getCurrentChatUserId();
+                if (!currentUserId || data.patient_id !== currentUserId) {
+                    return;
+                }
+                const normalizedStatus = String(data.status || '').toLowerCase();
+                loadReports();
+                if (normalizedStatus === 'sent' || normalizedStatus === 'approved') {
+                    showAlert('Your report is ready for review.', 'success');
+                } else if (normalizedStatus === 'rejected') {
+                    showAlert('Your report was updated with a rejection note.', 'warning');
+                } else {
+                    showAlert('Your report status was updated.', 'info');
+                }
+            });
+        }
+
+        function formatChatTimestamp(timestamp) {
+            const parsedTimestamp = new Date(timestamp);
+            if (Number.isNaN(parsedTimestamp.getTime())) {
+                return timestamp || '';
+            }
+            return parsedTimestamp.toLocaleString();
+        }
+
+        function formatMessageStatusLabel(status) {
+            const normalizedStatus = String(status || 'sent').toLowerCase();
+            if (normalizedStatus === 'seen') {
+                return 'Seen';
+            }
+            if (normalizedStatus === 'delivered') {
+                return 'Delivered';
+            }
+            return 'Sent';
+        }
+
+        function scrollChatToBottom() {
+            const box = document.getElementById('chatMessages');
+            if (box) {
+                box.scrollTop = box.scrollHeight;
+            }
         }
 
         function renderMediaMarkup(message) {
@@ -1301,15 +1564,15 @@
             }
             const safeUrl = escapeHtml(message.file_url);
             if (message.type === 'image') {
-                return `<img src="${safeUrl}" alt="Shared image" class="img-fluid rounded mt-2">`;
+                return `<div class="chat-media"><img src="${safeUrl}" alt="Shared image"></div>`;
             }
             if (message.type === 'video') {
-                return `<video controls class="w-100 rounded mt-2"><source src="${safeUrl}"></video>`;
+                return `<div class="chat-media"><video controls><source src="${safeUrl}"></video></div>`;
             }
             if (message.type === 'audio') {
-                return `<audio controls class="w-100 mt-2"><source src="${safeUrl}"></audio>`;
+                return `<div class="chat-media"><audio controls><source src="${safeUrl}"></audio></div>`;
             }
-            return `<a href="${safeUrl}" target="_blank" class="btn btn-primary mt-2">Open Media</a>`;
+            return `<div class="chat-media p-3"><a href="${safeUrl}" target="_blank" class="btn btn-primary">Open Media</a></div>`;
         }
 
         function renderMessages(messages) {
@@ -1320,27 +1583,36 @@
             }
 
             if (!messages.length) {
-                box.innerHTML = '<div class="info-card text-muted">No messages yet. Start the conversation with your doctor.</div>';
+                box.className = 'chat-thread';
+                box.innerHTML = '<div class="chat-thread-empty">No messages yet. Start the conversation with your doctor.</div>';
                 return;
             }
 
+            box.className = 'chat-thread';
             box.innerHTML = messages.map((message) => {
                 const isSelf = message.sender_id === currentUserId;
                 const senderLabel = escapeHtml(message.sender_name || (isSelf ? 'You' : 'Doctor'));
-                const messageText = message.message ? `<p class="mb-0 mt-2">${escapeHtml(message.message)}</p>` : '';
+                const messageText = message.message ? `<div class="chat-message-text">${escapeHtml(message.message)}</div>` : '';
+                const messageStatus = isSelf ? `
+                    <span class="chat-status ${escapeHtml(String(message.status || 'sent').toLowerCase())}">
+                        <i class="fas fa-check-double"></i>${escapeHtml(formatMessageStatusLabel(message.status))}
+                    </span>
+                ` : '';
                 return `
-                    <div class="${isSelf ? 'text-end' : ''}">
-                        <div class="info-card">
-                            <div class="d-flex justify-content-between ${isSelf ? 'flex-row-reverse' : ''}">
+                    <div class="chat-row ${isSelf ? 'self' : ''}">
+                        <div class="chat-bubble">
+                            <div class="chat-meta">
                                 <strong>${senderLabel}</strong>
-                                <small class="text-muted">${new Date(message.timestamp).toLocaleString()}</small>
+                                <span>${escapeHtml(formatChatTimestamp(message.timestamp))}</span>
                             </div>
                             ${messageText}
                             ${renderMediaMarkup(message)}
+                            ${messageStatus ? `<div class="mt-3 text-end">${messageStatus}</div>` : ''}
                         </div>
                     </div>
                 `;
             }).join('');
+            scrollChatToBottom();
         }
 
         async function loadChatPartner() {
@@ -1355,7 +1627,10 @@
                     if (summaryBox) {
                         summaryBox.innerHTML = `
                             <p><strong>${escapeHtml(selectedPartner.full_name || selectedPartner.username || 'Assigned Doctor')}</strong></p>
-                            <p class="text-muted mb-0">${escapeHtml(selectedPartner.email || 'Available for consultation')}</p>
+                            <p class="mb-1 text-muted">${escapeHtml(selectedPartner.email || 'Available for consultation')}</p>
+                            <p class="mb-0 text-muted">
+                                ${selectedPartner.unread_count ? `${escapeHtml(String(selectedPartner.unread_count))} unread message(s)` : 'Realtime chat is active'}
+                            </p>
                         `;
                     }
                     return true;
@@ -1493,13 +1768,18 @@
 
         async function loadMessages() {
             if (!chatPartnerId) {
+                renderMessages([]);
                 return;
             }
-
-            const response = await fetch(`/chat/history/${chatPartnerId}`);
-            const data = await response.json();
-            const messages = Array.isArray(data) ? data : (data.messages || []);
-            renderMessages(messages);
+            try {
+                const response = await fetch(`/chat/history/${chatPartnerId}?limit=200`);
+                const data = await response.json();
+                const messages = Array.isArray(data) ? data : (data.messages || []);
+                renderMessages(messages);
+            } catch (error) {
+                renderMessages([]);
+                showAlert('Unable to load chat history.', 'danger');
+            }
         }
 
         function getAppointmentStatusClass(status) {
@@ -1716,25 +1996,28 @@
                     ` : ''}
                     <div class="mb-3">
                         <label class="form-label">Available Dates</label>
-                        <div class="d-flex flex-wrap gap-2">
+                        <div class="appointment-date-grid">
                             ${appointmentAvailability.map((slot) => `
                                 <button
-                                    class="btn ${appointmentForm.date === slot.date ? 'btn-primary' : 'btn-secondary'} btn-sm"
+                                    class="appointment-date-card ${appointmentForm.date === slot.date ? 'active' : ''}"
                                     type="button"
                                     ${!(slot.available_slots || []).length ? 'disabled' : ''}
                                     onclick="selectAppointmentDate('${slot.date}')"
                                 >
-                                    ${escapeHtml(`${slot.day} ${slot.day_number} ${slot.month}`)}
+                                    <div class="fw-bold">${escapeHtml(slot.day || '')}</div>
+                                    <div class="fs-4 fw-bold">${escapeHtml(String(slot.day_number || ''))}</div>
+                                    <div class="text-muted">${escapeHtml(slot.month || '')}</div>
+                                    <div class="small text-muted mt-2">${escapeHtml(String((slot.available_slots || []).length))} slots</div>
                                 </button>
                             `).join('')}
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Available Time Slots</label>
-                        <div class="d-flex flex-wrap gap-2">
+                        <div class="time-chip-wrap">
                             ${availableTimes.length ? availableTimes.map((slotTime) => `
                                 <button
-                                    class="btn ${appointmentForm.time === slotTime ? 'btn-primary' : 'btn-secondary'} btn-sm"
+                                    class="time-chip ${appointmentForm.time === slotTime ? 'active' : ''}"
                                     type="button"
                                     onclick="selectAppointmentTime('${slotTime}')"
                                 >
@@ -1943,7 +2226,8 @@
                             ${appointment.doctor_specialization ? `<p class="mb-1"><strong>Specialty:</strong> ${escapeHtml(appointment.doctor_specialization)}</p>` : ''}
                             ${appointment.doctor_hospital ? `<p class="mb-1"><strong>Hospital:</strong> ${escapeHtml(appointment.doctor_hospital)}</p>` : ''}
                             <p class="mb-1"><strong>Date:</strong> ${escapeHtml(appointment.date)}</p>
-                            <p class="mb-0"><strong>Time:</strong> ${escapeHtml(appointment.time)}</p>
+                            <p class="mb-1"><strong>Time:</strong> ${escapeHtml(appointment.time)}</p>
+                            ${appointment.reason ? `<p class="mb-0 text-muted"><strong>Reason:</strong> ${escapeHtml(appointment.reason)}</p>` : ''}
                         </div>
                         <span class="status-badge status-${getAppointmentStatusClass(appointment.status)}">${escapeHtml(formatAppointmentStatusLabel(appointment.status))}</span>
                     </div>
@@ -1953,14 +2237,16 @@
         }
 
         async function loadAppointments() {
-            const currentUserId = getCurrentChatUserId();
-            if (!currentUserId) {
+            if (!getCurrentChatUserId()) {
                 return;
             }
 
             try {
-                const response = await fetch(`/get_appointments/${currentUserId}`);
+                const response = await fetch('/api/my_appointments');
                 const data = await response.json();
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Unable to load appointments');
+                }
                 renderAppointments(data.appointments || []);
             } catch (error) {
                 renderAppointments([]);
@@ -2017,7 +2303,6 @@
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    patient_id: getCurrentChatUserId(),
                     doctor_id: selectedDoctor.id,
                     date: appointmentForm.date,
                     time: appointmentForm.time,

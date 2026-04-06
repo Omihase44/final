@@ -1,14 +1,26 @@
-import os
+import importlib
 from typing import Any, Dict, Optional
 
 import numpy as np
 
 from utils.image_processing import extract_radiology_features, preprocess_classifier_image
-from utils.tensorflow_compat import get_tensorflow_keras, safe_load_keras_model
+from utils.tensorflow_compat import (
+    ModelUnavailableError,
+    get_tensorflow_keras,
+    require_strict_model_loading,
+    resolve_model_metadata,
+    resolve_model_path,
+    safe_load_keras_model,
+)
 
 
 TUMOR_TYPE_CLASSES = ["glioma tumor", "meningioma tumor", "no tumor", "pituitary tumor"]
 WHO_GRADE_CLASSES = ["Grade I", "Grade II", "Grade III", "Grade IV"]
+TUMOR_STAGE_BY_TYPE = {
+    "meningioma tumor": "Grade II",
+    "glioma tumor": "Grade III",
+    "pituitary tumor": "Grade IV",
+}
 
 
 def clamp(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
@@ -18,8 +30,13 @@ def clamp(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
 def build_tumor_grading_model(
     input_shape: tuple[int, int, int] = (224, 224, 3),
     num_classes: int = 4,
+    variant: str = "cnn",
+    weights: str = "imagenet",
+    dense_units: int = 256,
+    dropout_rate: float = 0.5,
+    fine_tune_layers: int = 0,
 ) -> Optional[Any]:
-    """Build a modified CNN with BatchNorm, Dropout, and softmax grading output."""
+    """Build a modified CNN or transfer-learning classifier for tumor staging."""
     tensorflow_keras = get_tensorflow_keras()
     if not tensorflow_keras["available"]:
         return None
@@ -30,50 +47,103 @@ def build_tumor_grading_model(
     Conv2D = layers.Conv2D
     Dense = layers.Dense
     Dropout = layers.Dropout
-    GlobalAveragePooling2D = layers.GlobalAveragePooling2D
+    Flatten = layers.Flatten
     Input = layers.Input
     MaxPooling2D = layers.MaxPooling2D
     Model = models.Model
 
     inputs = Input(shape=input_shape)
-    x = Conv2D(32, (3, 3), activation="relu", padding="same")(inputs)
-    x = BatchNormalization()(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Conv2D(64, (3, 3), activation="relu", padding="same")(x)
-    x = BatchNormalization()(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Conv2D(128, (3, 3), activation="relu", padding="same")(x)
-    x = BatchNormalization()(x)
-    x = MaxPooling2D((2, 2))(x)
-    x = Conv2D(256, (3, 3), activation="relu", padding="same")(x)
-    x = BatchNormalization()(x)
-    x = GlobalAveragePooling2D()(x)
-    x = Dropout(0.4)(x)
-    x = Dense(128, activation="relu")(x)
-    x = Dropout(0.3)(x)
+    normalized_variant = str(variant or "cnn").strip().lower()
+
+    if normalized_variant == "cnn":
+        x = Conv2D(32, (3, 3), activation="relu", padding="same")(inputs)
+        x = BatchNormalization()(x)
+        x = MaxPooling2D((2, 2))(x)
+        x = Conv2D(64, (3, 3), activation="relu", padding="same")(x)
+        x = BatchNormalization()(x)
+        x = MaxPooling2D((2, 2))(x)
+        x = Conv2D(128, (3, 3), activation="relu", padding="same")(x)
+        x = BatchNormalization()(x)
+        x = MaxPooling2D((2, 2))(x)
+        x = Flatten()(x)
+    else:
+        applications = importlib.import_module("tensorflow.keras.applications")
+        preprocessing_layers = {
+            "mobilenetv2": importlib.import_module("tensorflow.keras.applications.mobilenet_v2"),
+            "resnet50": importlib.import_module("tensorflow.keras.applications.resnet50"),
+            "vgg16": importlib.import_module("tensorflow.keras.applications.vgg16"),
+        }
+        if normalized_variant == "mobilenetv2":
+            backbone_class = applications.MobileNetV2
+            preprocessing = preprocessing_layers["mobilenetv2"].preprocess_input
+        elif normalized_variant == "resnet50":
+            backbone_class = applications.ResNet50
+            preprocessing = preprocessing_layers["resnet50"].preprocess_input
+        elif normalized_variant == "vgg16":
+            backbone_class = applications.VGG16
+            preprocessing = preprocessing_layers["vgg16"].preprocess_input
+        else:
+            raise ValueError(f"Unsupported tumor model variant: {variant}")
+
+        rescaled_inputs = layers.Rescaling(255.0, name=f"{normalized_variant}_rescale")(inputs)
+        processed_inputs = layers.Lambda(preprocessing, name=f"{normalized_variant}_preprocess")(rescaled_inputs)
+        base_model = backbone_class(
+            include_top=False,
+            weights=None if str(weights).lower() == "none" else weights,
+            input_shape=input_shape,
+        )
+        if fine_tune_layers > 0:
+            base_model.trainable = True
+            frozen_boundary = max(len(base_model.layers) - int(fine_tune_layers), 0)
+            for layer in base_model.layers[:frozen_boundary]:
+                layer.trainable = False
+            for layer in base_model.layers[frozen_boundary:]:
+                layer.trainable = True
+        else:
+            base_model.trainable = False
+        x = base_model(processed_inputs, training=False)
+        x = layers.GlobalAveragePooling2D()(x)
+
+    x = Dense(dense_units, activation="relu")(x)
+    x = Dropout(dropout_rate)(x)
     outputs = Dense(num_classes, activation="softmax", name="tumor_grade")(x)
-    return Model(inputs=inputs, outputs=outputs, name="tumor_grading_model")
+    return Model(inputs=inputs, outputs=outputs, name=f"tumor_grading_model_{normalized_variant}")
 
 
 class TumorGradingModel:
     """Tumor classifier that supports real models when available and heuristics otherwise."""
 
     def __init__(self, model_path: str = "brain_model_new.h5"):
-        self.model_path = os.path.abspath(model_path)
+        self.model_path = resolve_model_path(
+            model_path,
+            "BRAIN_MODEL_PATH",
+            manifest_key="brain_classifier",
+        )
+        self.metadata = resolve_model_metadata("brain_classifier")
+        self.class_names = self._resolve_class_names()
         self.model = self._load_model()
         self.backend = "keras" if self.model is not None else "heuristic"
+        self.strict_loading = require_strict_model_loading()
 
     def _load_model(self):
         return safe_load_keras_model(self.model_path)
 
-    def predict(self, image: np.ndarray) -> Dict[str, object]:
+    def _resolve_class_names(self):
+        metadata_classes = self.metadata.get("class_names")
+        if isinstance(metadata_classes, list) and metadata_classes:
+            return [str(name) for name in metadata_classes]
+        return list(TUMOR_TYPE_CLASSES)
+
+    def predict(self, image: np.ndarray, prepared_image: Optional[np.ndarray] = None) -> Dict[str, object]:
         features = extract_radiology_features(image)
-        model_output = self._predict_with_model(image)
+        model_output = self._predict_with_model(image, prepared_image=prepared_image)
 
         if model_output:
             tumor_type = model_output["classification"]
             type_confidence = model_output["confidence"]
             backend = self.backend
+        elif self.strict_loading:
+            raise ModelUnavailableError("Tumor classification model is unavailable.")
         else:
             tumor_type, type_confidence = self._heuristic_tumor_type(features)
             backend = "heuristic"
@@ -85,25 +155,33 @@ class TumorGradingModel:
         return {
             "detected": tumor_detected,
             "classification": tumor_type,
+            "tumor_type": tumor_type,
             "grade": tumor_grade,
+            "tumor_stage": tumor_grade,
             "confidence": round(confidence, 2),
+            "type_confidence": round(type_confidence, 2),
+            "stage_confidence": round(grade_confidence, 2),
             "backend": backend,
         }
 
-    def _predict_with_model(self, image: np.ndarray) -> Optional[Dict[str, object]]:
+    def _predict_with_model(
+        self,
+        image: np.ndarray,
+        prepared_image: Optional[np.ndarray] = None,
+    ) -> Optional[Dict[str, object]]:
         if self.model is None:
             return None
 
         try:
-            prepared_image = preprocess_classifier_image(image)
+            prepared_image = prepared_image if prepared_image is not None else preprocess_classifier_image(image)
             prediction = self.model.predict(prepared_image, verbose=0)
             scores = np.asarray(prediction).squeeze()
-            if scores.ndim != 1 or scores.shape[0] < len(TUMOR_TYPE_CLASSES):
+            if scores.ndim != 1 or scores.shape[0] < len(self.class_names):
                 return None
 
-            class_index = int(np.argmax(scores[: len(TUMOR_TYPE_CLASSES)]))
+            class_index = int(np.argmax(scores[: len(self.class_names)]))
             return {
-                "classification": TUMOR_TYPE_CLASSES[class_index],
+                "classification": self.class_names[class_index],
                 "confidence": clamp(scores[class_index]),
             }
         except Exception:
@@ -140,27 +218,25 @@ class TumorGradingModel:
         if not tumor_detected:
             return None, 0.1
 
-        type_bias = {
-            "glioma tumor": 0.22,
-            "meningioma tumor": 0.08,
-            "pituitary tumor": 0.04,
-        }.get(tumor_type, 0.0)
+        mapped_grade = TUMOR_STAGE_BY_TYPE.get(str(tumor_type).strip().lower())
+        if mapped_grade:
+            confidence = clamp(
+                0.74
+                + (features["texture_score"] * 0.18)
+                + (features["edge_density"] * 0.12)
+            )
+            return mapped_grade, round(confidence, 2)
 
         severity = clamp(
             (features["bright_ratio"] * 2.1)
             + (features["edge_density"] * 1.8)
             + (features["texture_score"] * 1.5)
             + (features["asymmetry"] * 2.2)
-            + type_bias
         )
-
-        if severity < 0.32:
-            grade = "Grade I"
-        elif severity < 0.52:
-            grade = "Grade II"
-        elif severity < 0.72:
-            grade = "Grade III"
-        else:
-            grade = "Grade IV"
-
-        return grade, round(clamp(0.6 + severity * 0.3, 0.6, 0.95), 2)
+        if severity < 0.3:
+            return "Grade I", round(clamp(0.62 + severity * 0.25, 0.62, 0.9), 2)
+        if severity < 0.52:
+            return "Grade II", round(clamp(0.66 + severity * 0.23, 0.66, 0.92), 2)
+        if severity < 0.72:
+            return "Grade III", round(clamp(0.7 + severity * 0.2, 0.7, 0.94), 2)
+        return "Grade IV", round(clamp(0.75 + severity * 0.18, 0.75, 0.96), 2)

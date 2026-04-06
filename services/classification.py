@@ -5,25 +5,12 @@ from typing import Dict, Optional
 
 import numpy as np
 
-from models.alzheimer_model import AlzheimerStagingModel
-from models.tumor_model import TumorGradingModel
+from models.alzheimer_model import normalize_alzheimer_stage_label
+from services.model_metrics import get_model_metrics
+from services.model_registry import get_model_registry
 
 
 LOGGER = logging.getLogger(__name__)
-ALZHEIMER_STAGE_ALIASES = {
-    "Early": "Early Stage",
-    "Moderate": "Moderate Stage",
-    "Severe": "Severe Stage",
-    "Early Stage": "Early Stage",
-    "Moderate Stage": "Moderate Stage",
-    "Severe Stage": "Severe Stage",
-}
-
-
-def normalize_alzheimer_stage(stage: Optional[str]) -> Optional[str]:
-    if stage is None:
-        return None
-    return ALZHEIMER_STAGE_ALIASES.get(stage, stage)
 
 
 def safe_dict(obj) -> Dict[str, object]:
@@ -62,31 +49,60 @@ class ClinicalClassificationService:
     """Coordinate tumor grading and Alzheimer staging models."""
 
     def __init__(self):
-        self.tumor_model = TumorGradingModel()
-        self.alzheimer_model = AlzheimerStagingModel()
+        model_registry = get_model_registry()
+        self.tumor_model = model_registry.get_tumor_model()
+        self.alzheimer_model = model_registry.get_alzheimer_model()
 
-    def classify(self, image: np.ndarray) -> Dict[str, Dict[str, object]]:
-        tumor_result = safe_dict(self.tumor_model.predict(image))
-        alzheimer_result = safe_dict(self.alzheimer_model.predict(image))
-        stage = normalize_alzheimer_stage(alzheimer_result.get("stage"))
+    def classify(
+        self,
+        image: np.ndarray,
+        detection_type: str = "combined",
+        prepared_inputs=None,
+    ) -> Dict[str, Dict[str, object]]:
+        detection_type = str(detection_type or "combined").strip().lower()
+        include_tumor = detection_type in {"combined", "brain"}
+        include_alzheimer = detection_type in {"combined", "alz"}
+        classifier_input = getattr(prepared_inputs, "classifier_input", None)
 
+        tumor_result = (
+            safe_dict(self.tumor_model.predict(image, prepared_image=classifier_input))
+            if include_tumor
+            else {}
+        )
+        alzheimer_result = (
+            safe_dict(self.alzheimer_model.predict(image, prepared_image=classifier_input))
+            if include_alzheimer
+            else {}
+        )
+        stage = normalize_alzheimer_stage_label(alzheimer_result.get("stage"))
+        tumor_metrics = get_model_metrics("brain_classifier")
+        alzheimer_metrics = get_model_metrics("alzheimer_classifier")
+
+        tumor_detected = bool(tumor_result.get("detected", False))
         tumor_payload = {
-            "detected": bool(tumor_result.get("detected", False)),
-            "classification": tumor_result.get("classification", "Tumor Detected" if tumor_result.get("detected") else "No Tumor"),
+            "detected": tumor_detected,
+            "classification": tumor_result.get("classification", "Tumor Detected" if tumor_detected else "No Tumor"),
+            "tumor_type": tumor_result.get("tumor_type") or tumor_result.get("classification", "Tumor Detected" if tumor_detected else "No Tumor"),
             "grade": tumor_result.get("grade"),
+            "tumor_stage": tumor_result.get("tumor_stage") or tumor_result.get("grade"),
             "confidence": normalize_confidence(tumor_result.get("confidence", 0)),
-            "backend": tumor_result.get("backend", self.tumor_model.backend),
-            "tumor_detected": bool(tumor_result.get("detected", False)),
+            "backend": tumor_result.get("backend", self.tumor_model.backend if include_tumor else "skipped"),
+            "tumor_detected": tumor_detected,
             "tumor_grade": tumor_result.get("grade"),
+            "type_confidence": normalize_confidence(tumor_result.get("type_confidence", tumor_result.get("confidence", 0))),
+            "stage_confidence": normalize_confidence(tumor_result.get("stage_confidence", tumor_result.get("confidence", 0))),
+            "model_metrics": tumor_metrics,
         }
+        alzheimer_detected = bool(alzheimer_result.get("detected", False))
         alzheimer_payload = {
-            "detected": bool(alzheimer_result.get("detected", False)),
+            "detected": alzheimer_detected,
             "stage": stage,
             "confidence": normalize_confidence(alzheimer_result.get("confidence", 0)),
-            "backend": alzheimer_result.get("backend", self.alzheimer_model.backend),
-            "alzheimers_detected": bool(alzheimer_result.get("detected", False)),
-            "alz_detected": bool(alzheimer_result.get("detected", False)),
+            "backend": alzheimer_result.get("backend", self.alzheimer_model.backend if include_alzheimer else "skipped"),
+            "alzheimers_detected": alzheimer_detected,
+            "alz_detected": alzheimer_detected,
             "alz_stage": stage,
+            "model_metrics": alzheimer_metrics,
         }
 
         LOGGER.info(

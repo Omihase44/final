@@ -1,30 +1,28 @@
 import json
-from functools import lru_cache
+import logging
 from typing import Dict, Optional
 
 import cv2
 import numpy as np
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from services.classification import get_classification_service
-from services.enhancement import ImageEnhancementService, save_analysis_assets
+from services.enhancement import save_analysis_assets
+from services.model_metrics import get_model_metrics
+from services.preprocessing import get_preprocessing_service
 from services.segmentation import get_segmentation_service
 from services.volume_calc import get_volume_calculation_service
 from utils.image_processing import (
     decode_base64_image,
-    decode_image_bytes,
     encode_image_to_base64,
     normalize_voxel_metadata,
 )
+from utils.tensorflow_compat import ModelUnavailableError
 
 
 analysis_bp = Blueprint("analysis", __name__)
 VALID_ANALYSIS_TYPES = {"combined", "brain", "alz"}
-
-
-@lru_cache(maxsize=1)
-def _get_enhancement_service():
-    return ImageEnhancementService()
+LOGGER = logging.getLogger(__name__)
 
 
 def _format_confidence(confidence: float) -> str:
@@ -72,8 +70,13 @@ def _normalize_tumor_prediction(value: object) -> Dict[str, object]:
     return {
         "detected": detected,
         "classification": result.get("classification") or ("Tumor Detected" if detected else "No Tumor"),
+        "tumor_type": result.get("tumor_type") or result.get("classification") or ("Tumor Detected" if detected else "No Tumor"),
         "grade": result.get("grade"),
+        "tumor_stage": result.get("tumor_stage") or result.get("grade"),
         "confidence": _normalize_confidence_value(result.get("confidence", 0)),
+        "type_confidence": _normalize_confidence_value(result.get("type_confidence", result.get("confidence", 0))),
+        "stage_confidence": _normalize_confidence_value(result.get("stage_confidence", result.get("confidence", 0))),
+        "model_metrics": safe_dict(result.get("model_metrics")),
     }
 
 
@@ -82,19 +85,24 @@ def _normalize_alzheimers_prediction(value: object) -> Dict[str, object]:
     detected = bool(result.get("detected", False))
     return {
         "detected": detected,
-        "stage": result.get("stage") or ("Positive" if detected else "NonDementia"),
+        "stage": result.get("stage") or ("Moderate" if detected else "NonDemented"),
         "confidence": _normalize_confidence_value(result.get("confidence", 0)),
+        "model_metrics": safe_dict(result.get("model_metrics")),
     }
 
 
 def predict_tumor(image: np.ndarray) -> Dict[str, object]:
     classification_service = get_classification_service()
-    classification_result = safe_dict(classification_service.classify(image))
+    classification_result = safe_dict(classification_service.classify(image, detection_type="brain"))
     result = _normalize_tumor_prediction(classification_result.get("tumor"))
     return {
         "detected": result["detected"],
+        "classification": result["classification"],
+        "tumor_type": result["tumor_type"],
         "grade": result["grade"],
+        "tumor_stage": result["tumor_stage"],
         "confidence": result["confidence"],
+        "model_metrics": result["model_metrics"] or get_model_metrics("brain_classifier"),
     }
 
 
@@ -102,23 +110,31 @@ def analyze_medical_image(
     image_bytes: bytes,
     detection_type: str = "combined",
     voxel_metadata: Optional[Dict[str, object]] = None,
+    include_encoded_images: bool = True,
 ) -> Dict[str, object]:
     """Run the unified neurodiagnostic pipeline for a single MRI image."""
-    original_image = decode_image_bytes(image_bytes)
-    enhancement_service = _get_enhancement_service()
+    preprocessing_service = get_preprocessing_service()
     classification_service = get_classification_service()
     segmentation_service = get_segmentation_service()
     volume_service = get_volume_calculation_service()
 
-    enhancement_result = enhancement_service.enhance(original_image)
-    enhanced_image = enhancement_result["enhanced_image"]
-    classification_result = safe_dict(classification_service.classify(enhanced_image))
+    prepared_inputs = preprocessing_service.prepare(image_bytes=image_bytes)
+    original_image = prepared_inputs.original_image
+    enhanced_image = prepared_inputs.enhanced_image
+    classification_result = safe_dict(
+        classification_service.classify(
+            enhanced_image,
+            detection_type=detection_type,
+            prepared_inputs=prepared_inputs,
+        )
+    )
     tumor_result = _normalize_tumor_prediction(classification_result.get("tumor"))
     alzheimer_result = _normalize_alzheimers_prediction(classification_result.get("alzheimers"))
     segmentation_result = segmentation_service.segment(
         original_image=original_image,
         working_image=enhanced_image,
         tumor_detected=tumor_result["detected"],
+        prepared_input=prepared_inputs.segmentation_input,
     )
     mask = segmentation_result["mask"]
 
@@ -145,31 +161,51 @@ def analyze_medical_image(
         }
     )
 
-    original_base64 = encode_image_to_base64(original_image, ".png")
-    enhanced_base64 = encode_image_to_base64(enhanced_image, ".png")
-    overlay_base64 = encode_image_to_base64(overlay, ".png")
-    mask_base64 = encode_image_to_base64(mask, ".png")
+    original_base64 = encode_image_to_base64(original_image, ".png") if include_encoded_images else None
+    enhanced_base64 = encode_image_to_base64(enhanced_image, ".png") if include_encoded_images else None
+    overlay_base64 = encode_image_to_base64(overlay, ".png") if include_encoded_images else None
+    mask_base64 = encode_image_to_base64(mask, ".png") if include_encoded_images else None
     tumor_volume_mm3 = round(volume_result["tumor_volume_mm3"], 2)
     detection_type = (detection_type or "combined").lower()
+    tumor_metrics = tumor_result.get("model_metrics") or get_model_metrics("brain_classifier")
+    alzheimer_metrics = alzheimer_result.get("model_metrics") or get_model_metrics("alzheimer_classifier")
 
     tumor_payload = {
         **tumor_result,
+        "tumor_type": tumor_result["tumor_type"],
+        "tumor_stage": tumor_result["tumor_stage"],
+        "confidence_score": round(float(tumor_result["confidence"]), 4),
         "confidence": _format_confidence(tumor_result["confidence"]),
+        "type_confidence_score": round(float(tumor_result["type_confidence"]), 4),
+        "type_confidence": _format_confidence(tumor_result["type_confidence"]),
+        "stage_confidence_score": round(float(tumor_result["stage_confidence"]), 4),
+        "stage_confidence": _format_confidence(tumor_result["stage_confidence"]),
+        "model_metrics": tumor_metrics,
         "volume_mm3": tumor_volume_mm3,
         "tumor_volume_mm3": tumor_volume_mm3,
     }
     alzheimer_payload = {
         **alzheimer_result,
+        "confidence_score": round(float(alzheimer_result["confidence"]), 4),
         "confidence": _format_confidence(alzheimer_result["confidence"]),
+        "model_metrics": alzheimer_metrics,
     }
+    mask_quality = "clear" if volume_result["white_pixel_count"] > 0 and segmentation_result["contour_count"] <= 3 else "review"
+    tumor_accuracy_label = tumor_metrics.get("accuracy_label") or "Unavailable"
+    tumor_accuracy_score = tumor_metrics.get("accuracy")
+    alzheimer_accuracy_label = alzheimer_metrics.get("accuracy_label") or "Unavailable"
 
     response = {
         "analysis_type": detection_type,
         "tumor": tumor_payload,
         "alzheimers": alzheimer_payload,
+        "model_metrics": {
+            "tumor": tumor_metrics,
+            "alzheimers": alzheimer_metrics,
+        },
         "enhancement": {
-            "backend": enhancement_result["backend"],
-            "steps": enhancement_result["steps"],
+            "backend": prepared_inputs.enhancement_backend,
+            "steps": prepared_inputs.enhancement_steps,
             "original_image": assets["files"]["original_image"],
             "enhanced_image": assets["files"]["enhanced_image"],
             "original_image_base64": original_base64,
@@ -182,10 +218,13 @@ def analyze_medical_image(
             "voxel_volume_mm3": volume_result["voxel_volume_mm3"],
             "mask_image": assets["files"]["mask_image"],
             "overlay_image": assets["files"]["overlay_image"],
+            "segmentation_overlay": assets["files"]["overlay_image"],
             "mask_image_base64": mask_base64,
             "overlay_image_base64": overlay_base64,
+            "segmentation_overlay_base64": overlay_base64,
             "bounding_box": segmentation_result["bounding_box"],
             "contour_count": segmentation_result["contour_count"],
+            "mask_quality": mask_quality,
         },
         "images": {
             "original": {"path": assets["files"]["original_image"], "base64": original_base64},
@@ -202,17 +241,36 @@ def analyze_medical_image(
         "enhanced_image_base64": enhanced_base64,
         "segmentation_image": overlay_base64,
         "segmentation_mask": mask_base64,
+        "segmentation_overlay": overlay_base64,
         "voxel_metadata": voxel_config,
         "white_pixel_count": volume_result["white_pixel_count"],
         "tumor_detected": tumor_result["detected"],
+        "tumor_type": tumor_payload["tumor_type"],
         "tumor_grade": tumor_result["grade"],
+        "tumor_stage": tumor_payload["tumor_stage"],
         "tumor_confidence": tumor_payload["confidence"],
+        "tumor_confidence_score": round(float(tumor_result["confidence"]), 4),
+        "model_accuracy": tumor_accuracy_label,
+        "model_accuracy_score": tumor_accuracy_score,
         "tumor_volume_mm3": tumor_volume_mm3,
         "alzheimers_detected": alzheimer_result["detected"],
         "alz_detected": alzheimer_result["detected"],
         "alzheimer_stage": alzheimer_result["stage"],
         "alz_stage": alzheimer_result["stage"],
         "alzheimer_confidence": alzheimer_payload["confidence"],
+        "alzheimer_confidence_score": round(float(alzheimer_result["confidence"]), 4),
+        "ai_clinical_insights": {
+            "tumor_type": tumor_payload["tumor_type"],
+            "tumor_stage": tumor_payload["tumor_stage"],
+            "tumor_confidence": tumor_payload["confidence"],
+            "tumor_volume_mm3": tumor_volume_mm3,
+            "model_accuracy": tumor_accuracy_label,
+            "model_accuracy_score": tumor_accuracy_score,
+            "alzheimer_stage": alzheimer_result["stage"],
+            "alzheimer_model_accuracy": alzheimer_accuracy_label,
+            "segmentation_boundary": "Detected" if segmentation_result["contour_count"] else "Not detected",
+            "mask_quality": mask_quality,
+        },
         "confidence": _format_confidence(
             max(float(tumor_result["confidence"]), float(alzheimer_result["confidence"]))
         ),
@@ -223,7 +281,9 @@ def analyze_medical_image(
             "type": "tumor",
             "detected": tumor_payload["detected"],
             "classification": tumor_payload["classification"],
+            "tumor_type": tumor_payload["tumor_type"],
             "grade": tumor_payload["grade"],
+            "tumor_stage": tumor_payload["tumor_stage"],
             "confidence": tumor_payload["confidence"],
         }
     elif detection_type == "alz":
@@ -308,30 +368,44 @@ def _extract_json_payload() -> Dict[str, object]:
 @analysis_bp.route("/analyze", methods=["POST"])
 @analysis_bp.route("/api/analyze", methods=["POST"])
 def analyze_route():
-    if "file" not in request.files:
-        return jsonify({"success": False, "error": "No file uploaded"}), 400
-
-    file = request.files["file"]
-    file_bytes = np.frombuffer(file.read(), np.uint8)
-    image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
-    if image is None:
-        return jsonify({"success": False, "error": "Invalid image"}), 400
-
     try:
-        result = safe_dict(predict_tumor(image))
-        confidence = _normalize_confidence_value(result.get("confidence", 0))
-        confidence_percent = str(round(confidence * 100, 2)) + "%"
+        configured_api_keys = current_app.config.get("API_KEYS") or set()
+        if configured_api_keys and "user_id" not in request.headers and "user_id" not in request.form:
+            api_key = request.headers.get("X-API-Key") or request.args.get("api_key")
+            if api_key not in configured_api_keys:
+                return jsonify({"success": False, "error": "Unauthorized API request."}), 401
+
+        image_bytes = _extract_request_image_bytes()
+        analysis = analyze_medical_image(
+            image_bytes=image_bytes,
+            detection_type="brain",
+            voxel_metadata=_extract_voxel_payload(),
+            include_encoded_images=False,
+        )
+        tumor_payload = safe_dict(analysis.get("tumor"))
 
         return jsonify(
             {
                 "success": True,
                 "tumor": {
-                    "detected": result.get("detected", False),
-                    "grade": result.get("grade"),
-                    "confidence": confidence_percent,
+                    "detected": tumor_payload.get("detected", False),
+                    "classification": tumor_payload.get("classification"),
+                    "tumor_type": tumor_payload.get("tumor_type"),
+                    "grade": tumor_payload.get("grade"),
+                    "tumor_stage": tumor_payload.get("tumor_stage"),
+                    "confidence": tumor_payload.get("confidence"),
+                    "model_metrics": tumor_payload.get("model_metrics"),
+                    "model_accuracy": (tumor_payload.get("model_metrics") or {}).get("accuracy_label"),
                 },
+                "segmentation": safe_dict(analysis.get("segmentation")),
+                "ai_clinical_insights": safe_dict(analysis.get("ai_clinical_insights")),
             }
         )
+    except ModelUnavailableError as exc:
+        LOGGER.error("Model unavailable for analysis request: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 503
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     except Exception as exc:
+        LOGGER.exception("Unexpected failure during /analyze request")
         return jsonify({"success": False, "error": str(exc)}), 500

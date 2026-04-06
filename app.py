@@ -18,8 +18,10 @@ from PIL import Image as PILImage
 from routes.analysis_routes import analysis_bp, analyze_medical_image
 from routes.appointment_routes import create_appointment_blueprint, register_appointment_socketio
 from routes.chat_routes import create_chat_blueprint, register_chat_socketio
+from services.data_store import bootstrap_platform_data, init_platform_database, sync_reports_to_db, sync_users_to_db
+from services.model_registry import get_model_registry
 from services.report_generator import build_medical_report_pdf
-from utils.tensorflow_compat import safe_load_keras_model
+from socket_handler import emit_report_status_updated, emit_scan_uploaded
 
 try:
     from flask_socketio import SocketIO
@@ -75,6 +77,7 @@ REPORTS_FILE = _resolve_runtime_path("REPORTS_FILE", "reports.json")
 PATIENT_DETAILS_FILE = _resolve_runtime_path("PATIENT_DETAILS_FILE", "patient_details.json")
 CHAT_DB_PATH = _resolve_runtime_path("CHAT_DB_PATH", "chat_store.sqlite3")
 APPOINTMENT_DB_PATH = _resolve_runtime_path("APPOINTMENT_DB_PATH", "appointment_store.sqlite3")
+PLATFORM_DB_PATH = _resolve_runtime_path("PLATFORM_DB_PATH", "platform_store_runtime.sqlite3")
 DATA_SEED_FILES = (
     (USERS_FILE, {"doctors": [], "patients": []}),
     (REPORTS_FILE, []),
@@ -85,11 +88,13 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['CHAT_DB_PATH'] = CHAT_DB_PATH
 app.config['APPOINTMENT_DB_PATH'] = APPOINTMENT_DB_PATH
+app.config['PLATFORM_DB_PATH'] = PLATFORM_DB_PATH
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(CHAT_MEDIA_FOLDER, exist_ok=True)
 for seed_path, default_value in DATA_SEED_FILES:
     _ensure_json_file(seed_path, default_value)
+init_platform_database(PLATFORM_DB_PATH)
 
 # Global variables for models
 brain_model = None
@@ -173,6 +178,20 @@ def safe_dict(obj):
     return {}
 
 
+def normalize_metric_payload(value):
+    metrics_payload = _coerce_dict(value)
+    if not metrics_payload:
+        return {}
+
+    if 'f1_score' not in metrics_payload and metrics_payload.get('f1') is not None:
+        metrics_payload['f1_score'] = metrics_payload.get('f1')
+    for metric_key in ('accuracy', 'precision', 'recall', 'f1_score'):
+        normalized_label = format_confidence_percentage(metrics_payload.get(metric_key))
+        if normalized_label:
+            metrics_payload[f'{metric_key}_label'] = normalized_label
+    return metrics_payload
+
+
 def _coerce_dict(value):
     return safe_dict(value)
 
@@ -205,6 +224,11 @@ def normalize_analysis_payload(analysis):
     tumor_payload = _coerce_dict(analysis.get('tumor'))
     if tumor_payload:
         tumor_payload['confidence'] = format_confidence_percentage(tumor_payload.get('confidence'))
+        tumor_payload['type_confidence'] = format_confidence_percentage(tumor_payload.get('type_confidence'))
+        tumor_payload['stage_confidence'] = format_confidence_percentage(tumor_payload.get('stage_confidence'))
+        tumor_payload['tumor_type'] = tumor_payload.get('tumor_type') or tumor_payload.get('classification')
+        tumor_payload['tumor_stage'] = tumor_payload.get('tumor_stage') or tumor_payload.get('grade')
+        tumor_payload['model_metrics'] = normalize_metric_payload(tumor_payload.get('model_metrics'))
         if 'tumor_volume_mm3' in tumor_payload and 'volume_mm3' not in tumor_payload:
             tumor_payload['volume_mm3'] = tumor_payload.get('tumor_volume_mm3')
     analysis['tumor'] = tumor_payload
@@ -212,15 +236,31 @@ def normalize_analysis_payload(analysis):
     alzheimers_payload = _coerce_dict(analysis.get('alzheimers'))
     if alzheimers_payload:
         alzheimers_payload['confidence'] = format_confidence_percentage(alzheimers_payload.get('confidence'))
+        alzheimers_payload['model_metrics'] = normalize_metric_payload(alzheimers_payload.get('model_metrics'))
+        alzheimers_payload['stage'] = _first_non_empty(
+            alzheimers_payload.get('stage'),
+            analysis.get('alzheimer_stage'),
+            analysis.get('alz_stage'),
+        )
     analysis['alzheimers'] = alzheimers_payload
 
     primary_result = _coerce_dict(analysis.get('primary_result'))
     if primary_result and 'confidence' in primary_result:
         primary_result['confidence'] = format_confidence_percentage(primary_result.get('confidence'))
     analysis['primary_result'] = primary_result
+    analysis['model_metrics'] = {
+        'tumor': normalize_metric_payload(_coerce_dict((_coerce_dict(analysis.get('model_metrics'))).get('tumor'))),
+        'alzheimers': normalize_metric_payload(_coerce_dict((_coerce_dict(analysis.get('model_metrics'))).get('alzheimers'))),
+    }
+    analysis['model_accuracy'] = format_confidence_percentage(analysis.get('model_accuracy'))
 
     analysis['tumor_confidence'] = format_confidence_percentage(analysis.get('tumor_confidence'))
     analysis['alzheimer_confidence'] = format_confidence_percentage(analysis.get('alzheimer_confidence'))
+    analysis['alzheimer_stage'] = _first_non_empty(
+        analysis.get('alzheimer_stage'),
+        analysis.get('alz_stage'),
+        alzheimers_payload.get('stage'),
+    )
     analysis['confidence'] = format_confidence_percentage(analysis.get('confidence'))
     return analysis
 
@@ -292,6 +332,24 @@ def normalize_report_record(report):
     report['enhanced_image'] = _first_non_empty(report.get('enhanced_image'), report['enhanced_mri'])
     report['segmentation_image'] = _first_non_empty(report.get('segmentation_image'), report['segmentation_overlay'])
     report['segmented_image'] = _first_non_empty(report.get('segmented_image'), report['segmentation_overlay'])
+    report['tumor_type'] = _first_non_empty(
+        report.get('tumor_type'),
+        (report['analysis'].get('tumor') or {}).get('tumor_type'),
+        (report['analysis'].get('tumor') or {}).get('classification'),
+        report.get('result'),
+    )
+    report['tumor_stage'] = _first_non_empty(
+        report.get('tumor_stage'),
+        (report['analysis'].get('tumor') or {}).get('tumor_stage'),
+        (report['analysis'].get('tumor') or {}).get('grade'),
+        report.get('tumor_grade'),
+    )
+    report['alzheimer_stage'] = _first_non_empty(
+        report.get('alzheimer_stage'),
+        (report['analysis'].get('alzheimers') or {}).get('stage'),
+        report['analysis'].get('alzheimer_stage'),
+        report.get('alz_stage'),
+    )
 
     tumor_confidence = format_confidence_percentage(
         _first_non_empty(
@@ -322,6 +380,25 @@ def normalize_report_record(report):
     report['alzheimer_confidence'] = alzheimer_confidence
     report['ai_confidence'] = ai_confidence
     report['confidence'] = ai_confidence
+    report['model_metrics'] = _coerce_dict(report.get('model_metrics')) or _coerce_dict(report['analysis'].get('model_metrics'))
+    if isinstance(report['model_metrics'], dict):
+        report['model_metrics']['tumor'] = normalize_metric_payload(_coerce_dict(report['model_metrics'].get('tumor')))
+        report['model_metrics']['alzheimers'] = normalize_metric_payload(_coerce_dict(report['model_metrics'].get('alzheimers')))
+    report['model_accuracy'] = _first_non_empty(
+        format_confidence_percentage(report.get('model_accuracy')),
+        normalize_metric_payload(_coerce_dict(report['model_metrics'].get('tumor'))).get('accuracy_label') if isinstance(report['model_metrics'], dict) else None,
+        normalize_metric_payload(_coerce_dict((report['analysis'].get('tumor') or {}).get('model_metrics'))).get('accuracy_label'),
+    )
+    report['ai_clinical_insights'] = _coerce_dict(report.get('ai_clinical_insights')) or _coerce_dict(report['analysis'].get('ai_clinical_insights'))
+    if isinstance(report['ai_clinical_insights'], dict):
+        report['ai_clinical_insights']['alzheimer_stage'] = _first_non_empty(
+            report['ai_clinical_insights'].get('alzheimer_stage'),
+            report['alzheimer_stage'],
+        )
+        report['ai_clinical_insights']['model_accuracy'] = _first_non_empty(
+            report['ai_clinical_insights'].get('model_accuracy'),
+            report['model_accuracy'],
+        )
 
     model_confidences = _coerce_dict(report.get('model_confidences'))
     if model_confidences:
@@ -332,12 +409,23 @@ def normalize_report_record(report):
     analysis_tumor = report['analysis'].get('tumor')
     if isinstance(analysis_tumor, dict):
         analysis_tumor['confidence'] = tumor_confidence
+        analysis_tumor['tumor_type'] = report['tumor_type']
+        analysis_tumor['tumor_stage'] = report['tumor_stage']
+        analysis_tumor['model_metrics'] = normalize_metric_payload(
+            _coerce_dict(analysis_tumor.get('model_metrics')) or _coerce_dict(report['model_metrics'].get('tumor'))
+        )
     analysis_alzheimers = report['analysis'].get('alzheimers')
     if isinstance(analysis_alzheimers, dict):
         analysis_alzheimers['confidence'] = alzheimer_confidence
+        analysis_alzheimers['stage'] = report['alzheimer_stage']
+        analysis_alzheimers['model_metrics'] = normalize_metric_payload(
+            _coerce_dict(analysis_alzheimers.get('model_metrics')) or _coerce_dict(report['model_metrics'].get('alzheimers'))
+        )
     if isinstance(report['analysis'].get('primary_result'), dict) and report['analysis']['primary_result'].get('confidence') is None:
         report['analysis']['primary_result']['confidence'] = ai_confidence
     report['analysis']['confidence'] = ai_confidence
+    report['analysis']['model_accuracy'] = report['model_accuracy']
+    report['analysis']['alzheimer_stage'] = report['alzheimer_stage']
 
     return report
 
@@ -345,25 +433,34 @@ def load_users():
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'r') as f:
             loaded = safe_dict(json.load(f))
-            return {
+            users_payload = {
                 "doctors": _coerce_dict_list(loaded.get("doctors")),
                 "patients": _coerce_dict_list(loaded.get("patients")),
             }
-    return {"doctors": [], "patients": []}
+            sync_users_to_db(app.config['PLATFORM_DB_PATH'], users_payload)
+            return users_payload
+    users_payload = {"doctors": [], "patients": []}
+    sync_users_to_db(app.config['PLATFORM_DB_PATH'], users_payload)
+    return users_payload
 
 def save_users(users):
     with open(USERS_FILE, 'w') as f:
         json.dump(users, f, indent=2)
+    sync_users_to_db(app.config['PLATFORM_DB_PATH'], users)
 
 def load_reports():
     if os.path.exists(REPORTS_FILE):
         with open(REPORTS_FILE, 'r') as f:
-            return [normalize_report_record(report) for report in _coerce_dict_list(json.load(f))]
+            reports = [normalize_report_record(report) for report in _coerce_dict_list(json.load(f))]
+            sync_reports_to_db(app.config['PLATFORM_DB_PATH'], reports)
+            return reports
+    sync_reports_to_db(app.config['PLATFORM_DB_PATH'], [])
     return []
 
 def save_reports(reports):
     with open(REPORTS_FILE, 'w') as f:
         json.dump([normalize_report_record(report) for report in reports], f, indent=2)
+    sync_reports_to_db(app.config['PLATFORM_DB_PATH'], reports)
 
 def load_patient_details():
     if os.path.exists(PATIENT_DETAILS_FILE):
@@ -391,7 +488,7 @@ def login_required(user_type=None):
 def load_brain_model():
     global brain_model
     if brain_model is None:
-        brain_model = safe_load_keras_model(os.path.join(BASE_DIR, 'brain_model_new.h5'))
+        brain_model = get_model_registry().get_tumor_model().model
         if brain_model is None:
             print("Brain model not found. Using fallback mode.")
     return brain_model
@@ -399,7 +496,7 @@ def load_brain_model():
 def load_alz_model():
     global alz_model
     if alz_model is None:
-        alz_model = safe_load_keras_model(os.path.join(BASE_DIR, 'alz_model_new.h5'))
+        alz_model = get_model_registry().get_alzheimer_model().model
         if alz_model is None:
             print("Alzheimer model not found. Using fallback mode.")
     return alz_model
@@ -530,6 +627,9 @@ def get_detailed_data(cls):
         "severity": "Unknown",
         "urgency": "Consult doctor"
     })
+
+
+bootstrap_platform_data(app.config['PLATFORM_DB_PATH'], load_users(), load_reports())
 
 app.register_blueprint(analysis_bp)
 app.register_blueprint(
@@ -840,13 +940,18 @@ def patient_upload():
                 'ai_result': result,
                 'ai_confidence': confidence,
                 'tumor_confidence': tumor_result.get('confidence'),
+                'tumor_type': tumor_result.get('tumor_type') or tumor_result.get('classification'),
                 'alzheimer_confidence': alzheimer_result.get('confidence'),
                 'analysis': analysis,
                 'tumor_detected': tumor_result.get('detected', False),
                 'tumor_grade': tumor_result.get('grade'),
+                'tumor_stage': tumor_result.get('tumor_stage') or tumor_result.get('grade'),
                 'tumor_volume_mm3': tumor_result.get('volume_mm3'),
                 'alzheimer_detected': alzheimer_result.get('detected', False),
                 'alzheimer_stage': alzheimer_result.get('stage'),
+                'model_accuracy': analysis.get('model_accuracy'),
+                'model_metrics': analysis.get('model_metrics'),
+                'ai_clinical_insights': analysis.get('ai_clinical_insights'),
                 'segmentation_image': analysis.get('segmentation_image'),
                 'segmentation_overlay': analysis.get('segmentation_image'),
                 'segmented_image': analysis.get('segmentation_image'),
@@ -875,11 +980,29 @@ def patient_upload():
             if str(session['user_id']) in patient_details:
                 patient_details[str(session['user_id'])]['reports'].append(report['id'])
                 save_patient_details(patient_details)
+
+            users_payload = load_users()
+            patient_record = next(
+                (patient for patient in users_payload.get('patients', []) if int(patient.get('id', -1)) == int(session['user_id'])),
+                None,
+            )
+            assigned_doctor = patient_record.get('assigned_doctor') if isinstance(patient_record, dict) else None
+            try:
+                emit_scan_uploaded(
+                    socketio,
+                    report,
+                    doctor_id=int(assigned_doctor) if assigned_doctor not in (None, "", 0) else None,
+                )
+            except Exception:
+                pass
             
             return jsonify({
                 'success': True,
                 'result': result,
                 'confidence': confidence,
+                'tumor_type': analysis.get('tumor_type'),
+                'tumor_stage': analysis.get('tumor_stage'),
+                'model_accuracy': analysis.get('model_accuracy'),
                 'detailed_info': detailed_info,
                 'report_id': report['id'],
                 'analysis': analysis,
@@ -1013,6 +1136,10 @@ def update_report(report_id):
     report['reviewed_date'] = datetime.now().isoformat()
     
     save_reports(reports)
+    try:
+        emit_report_status_updated(socketio, report, doctor_id=session.get('user_id'))
+    except Exception:
+        pass
     
     return jsonify({'success': True, 'message': 'Report saved as draft'})
 
@@ -1037,6 +1164,10 @@ def approve_report(report_id):
     report['approved_date'] = datetime.now().isoformat()
     
     save_reports(reports)
+    try:
+        emit_report_status_updated(socketio, report, doctor_id=session.get('user_id'))
+    except Exception:
+        pass
     
     return jsonify({'success': True, 'message': 'Report approved'})
 
@@ -1059,6 +1190,10 @@ def reject_report(report_id):
     report['rejected_date'] = datetime.now().isoformat()
     
     save_reports(reports)
+    try:
+        emit_report_status_updated(socketio, report, doctor_id=session.get('user_id'))
+    except Exception:
+        pass
     
     return jsonify({'success': True, 'message': 'Report rejected'})
 
@@ -1083,6 +1218,10 @@ def send_report_to_patient(report_id):
     report['sent_date'] = datetime.now().isoformat()
     
     save_reports(reports)
+    try:
+        emit_report_status_updated(socketio, report, doctor_id=session.get('user_id'))
+    except Exception:
+        pass
     
     return jsonify({'success': True, 'message': 'Report sent to patient'})
 

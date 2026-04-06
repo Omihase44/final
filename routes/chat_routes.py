@@ -1,12 +1,16 @@
 import os
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from hashlib import sha1
 from typing import Dict, Optional
+from threading import Lock
 
 from flask import Blueprint, jsonify, request, session
 from werkzeug.utils import secure_filename
+
+from socket_handler import join_default_socket_rooms
 
 try:
     from flask_socketio import join_room
@@ -14,6 +18,7 @@ except ImportError:  # pragma: no cover - optional until dependency is installed
     join_room = None
 
 from services.chat_service import (
+    build_conversation_key,
     build_chat_payload,
     ensure_assigned_doctor,
     ensure_patient_doctor_roles,
@@ -40,6 +45,8 @@ CHAT_MEDIA_ACCEPTED_EXTENSIONS = {
 _BROKEN_SQLITE_PATHS = set()
 _MEMORY_KEEPALIVE_CONNECTIONS = {}
 _REGISTERED_SOCKETIOS = {}
+_ACTIVE_SOCKET_USERS = {}
+_ACTIVE_SOCKET_USERS_LOCK = Lock()
 
 
 def _coerce_payload_dict(value):
@@ -147,6 +154,33 @@ def _create_chat_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_column(connection, "messages", "file_url", "TEXT")
     _ensure_column(connection, "messages", "type", "TEXT NOT NULL DEFAULT 'text'")
+    _ensure_column(connection, "messages", "status", "TEXT NOT NULL DEFAULT 'sent'")
+    _ensure_column(connection, "messages", "delivered_at", "TEXT")
+    _ensure_column(connection, "messages", "seen_at", "TEXT")
+    _ensure_column(connection, "messages", "conversation_key", "TEXT")
+    connection.execute(
+        """
+        UPDATE messages
+        SET status = 'sent'
+        WHERE status IS NULL OR TRIM(status) = ''
+        """
+    )
+    connection.execute(
+        """
+        UPDATE messages
+        SET conversation_key = (
+            SELECT
+                CASE
+                    WHEN sender.source_id <= receiver.source_id
+                    THEN printf('%d:%d', sender.source_id, receiver.source_id)
+                    ELSE printf('%d:%d', receiver.source_id, sender.source_id)
+                END
+            FROM users AS sender, users AS receiver
+            WHERE sender.id = messages.sender_id AND receiver.id = messages.receiver_id
+        )
+        WHERE conversation_key IS NULL OR TRIM(conversation_key) = ''
+        """
+    )
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_messages_sender_receiver_timestamp
@@ -157,6 +191,18 @@ def _create_chat_schema(connection: sqlite3.Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_messages_timestamp
         ON messages(timestamp)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_messages_conversation_timestamp
+        ON messages(conversation_key, timestamp)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_messages_status
+        ON messages(status)
         """
     )
 
@@ -249,13 +295,84 @@ def _get_chat_user(connection: sqlite3.Connection, source_id: int, role: str):
     ).fetchone()
 
 
+def _socket_user_key(user_id: int, user_role: Optional[str] = None) -> str:
+    normalized_role = str(user_role or "").strip().lower() or "unknown"
+    return f"{normalized_role}:{int(user_id)}"
+
+
+def _track_active_socket(db_path: str, user_id: int, user_role: Optional[str], socket_id: str) -> None:
+    resolved_path = os.path.abspath(db_path)
+    with _ACTIVE_SOCKET_USERS_LOCK:
+        user_sockets = _ACTIVE_SOCKET_USERS.setdefault(resolved_path, {})
+        user_sockets.setdefault(_socket_user_key(user_id, user_role), set()).add(socket_id)
+
+
+def _remove_active_socket(db_path: str, socket_id: str) -> None:
+    resolved_path = os.path.abspath(db_path)
+    with _ACTIVE_SOCKET_USERS_LOCK:
+        user_sockets = _ACTIVE_SOCKET_USERS.get(resolved_path, {})
+        empty_user_ids = []
+        for user_id, socket_ids in user_sockets.items():
+            if socket_id in socket_ids:
+                socket_ids.discard(socket_id)
+            if not socket_ids:
+                empty_user_ids.append(user_id)
+        for user_id in empty_user_ids:
+            user_sockets.pop(user_id, None)
+        if not user_sockets:
+            _ACTIVE_SOCKET_USERS.pop(resolved_path, None)
+
+
+def _is_user_online(db_path: str, user_id: int, user_role: Optional[str] = None) -> bool:
+    resolved_path = os.path.abspath(db_path)
+    with _ACTIVE_SOCKET_USERS_LOCK:
+        socket_ids = (_ACTIVE_SOCKET_USERS.get(resolved_path) or {}).get(_socket_user_key(user_id, user_role), set())
+        return bool(socket_ids)
+
+
+def _build_status_payload(
+    message_id: int,
+    sender_id: int,
+    sender_role: str,
+    receiver_id: int,
+    receiver_role: str,
+    status: str,
+    conversation_key: str,
+    delivered_at: Optional[str] = None,
+    seen_at: Optional[str] = None,
+) -> dict:
+    return {
+        "message_id": int(message_id),
+        "sender_id": int(sender_id),
+        "sender_role": sender_role,
+        "receiver_id": int(receiver_id),
+        "receiver_role": receiver_role,
+        "status": str(status or "sent").strip().lower(),
+        "delivered_at": delivered_at,
+        "seen_at": seen_at,
+        "conversation_key": conversation_key,
+    }
+
+
+def _emit_message_status(db_path: str, payload: dict) -> None:
+    socketio = _REGISTERED_SOCKETIOS.get(os.path.abspath(db_path))
+    if socketio is None:
+        return
+
+    sender_room = get_socket_room(payload["sender_id"], payload.get("sender_role"))
+    receiver_room = get_socket_room(payload["receiver_id"], payload.get("receiver_role"))
+    socketio.emit("message_status", payload, to=sender_room)
+    if receiver_room != sender_room:
+        socketio.emit("message_status", payload, to=receiver_room)
+
+
 def _broadcast_message(db_path: str, payload: dict) -> None:
     socketio = _REGISTERED_SOCKETIOS.get(os.path.abspath(db_path))
     if socketio is None:
         return
 
-    sender_room = get_socket_room(payload["sender_id"])
-    receiver_room = get_socket_room(payload["receiver_id"])
+    sender_room = get_socket_room(payload["sender_id"], payload.get("sender_role"))
+    receiver_room = get_socket_room(payload["receiver_id"], payload.get("receiver_role"))
     socketio.emit("receive_message", payload, to=sender_room)
     if receiver_room != sender_room:
         socketio.emit("receive_message", payload, to=receiver_room)
@@ -287,7 +404,130 @@ def _serialize_message_row(row) -> dict:
         "file_url": row["file_url"],
         "type": row["type"],
         "timestamp": row["timestamp"],
+        "status": row["status"],
+        "delivered_at": row["delivered_at"],
+        "seen_at": row["seen_at"],
+        "conversation_key": row["conversation_key"],
     }
+
+
+def _mark_messages_delivered(db_path: str, receiver_source_id: int, receiver_role: Optional[str]) -> list[dict]:
+    if receiver_role not in {"patient", "doctor"}:
+        return []
+
+    with closing(_get_connection_with_rows(db_path)) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                messages.id,
+                sender.source_id AS sender_source_id,
+                sender.role AS sender_role,
+                receiver.source_id AS receiver_source_id,
+                receiver.role AS receiver_role,
+                messages.conversation_key
+            FROM messages
+            JOIN users AS sender ON sender.id = messages.sender_id
+            JOIN users AS receiver ON receiver.id = messages.receiver_id
+            WHERE receiver.source_id = ?
+              AND receiver.role = ?
+              AND (messages.status IS NULL OR messages.status = 'sent')
+            """,
+            (receiver_source_id, receiver_role),
+        ).fetchall()
+        if not rows:
+            return []
+
+        delivered_at = datetime.now().isoformat()
+        message_ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" for _ in message_ids)
+        connection.execute(
+            f"""
+            UPDATE messages
+            SET status = 'delivered',
+                delivered_at = COALESCE(delivered_at, ?)
+            WHERE id IN ({placeholders})
+            """,
+            [delivered_at, *message_ids],
+        )
+        connection.commit()
+
+    return [
+        _build_status_payload(
+            message_id=row["id"],
+            sender_id=row["sender_source_id"],
+            sender_role=row["sender_role"],
+            receiver_id=row["receiver_source_id"],
+            receiver_role=row["receiver_role"],
+            status="delivered",
+            delivered_at=delivered_at,
+            seen_at=None,
+            conversation_key=row["conversation_key"] or build_conversation_key(row["sender_source_id"], row["receiver_source_id"]),
+        )
+        for row in rows
+    ]
+
+
+def _mark_conversation_seen(
+    db_path: str,
+    current_source_id: int,
+    current_role: str,
+    counterpart_source_id: int,
+    counterpart_role: str,
+) -> list[dict]:
+    with closing(_get_connection_with_rows(db_path)) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                messages.id,
+                sender.source_id AS sender_source_id,
+                sender.role AS sender_role,
+                receiver.source_id AS receiver_source_id,
+                receiver.role AS receiver_role,
+                messages.delivered_at,
+                messages.conversation_key
+            FROM messages
+            JOIN users AS sender ON sender.id = messages.sender_id
+            JOIN users AS receiver ON receiver.id = messages.receiver_id
+            WHERE sender.source_id = ?
+              AND sender.role = ?
+              AND receiver.source_id = ?
+              AND receiver.role = ?
+              AND COALESCE(messages.status, 'sent') != 'seen'
+            """,
+            (counterpart_source_id, counterpart_role, current_source_id, current_role),
+        ).fetchall()
+        if not rows:
+            return []
+
+        event_time = datetime.now().isoformat()
+        message_ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" for _ in message_ids)
+        connection.execute(
+            f"""
+            UPDATE messages
+            SET status = 'seen',
+                delivered_at = COALESCE(delivered_at, ?),
+                seen_at = ?
+            WHERE id IN ({placeholders})
+            """,
+            [event_time, event_time, *message_ids],
+        )
+        connection.commit()
+
+    return [
+        _build_status_payload(
+            message_id=row["id"],
+            sender_id=row["sender_source_id"],
+            sender_role=row["sender_role"],
+            receiver_id=row["receiver_source_id"],
+            receiver_role=row["receiver_role"],
+            status="seen",
+            delivered_at=row["delivered_at"] or event_time,
+            seen_at=event_time,
+            conversation_key=row["conversation_key"] or build_conversation_key(row["sender_source_id"], row["receiver_source_id"]),
+        )
+        for row in rows
+    ]
 
 
 def _create_message_payload(
@@ -342,7 +582,7 @@ def _create_message_payload(
 
     sync_users_to_chat_db(db_path, users_payload)
     timestamp = datetime.now().isoformat()
-    with _get_connection_with_rows(db_path) as connection:
+    with closing(_get_connection_with_rows(db_path)) as connection:
         sender = _get_chat_user(connection, sender_source_id, authenticated_role)
         receiver = _get_chat_user(connection, receiver_source_id, receiver_role)
         if sender is None:
@@ -352,13 +592,30 @@ def _create_message_payload(
         if sender["id"] == receiver["id"]:
             raise ValueError("Sender and receiver must be different users.")
         ensure_patient_doctor_roles(sender["role"], receiver["role"])
+        conversation_key = build_conversation_key(sender_source_id, receiver_source_id)
+        status = "delivered" if _is_user_online(db_path, receiver_source_id, receiver_role) else "sent"
+        delivered_at = timestamp if status == "delivered" else None
 
         cursor = connection.execute(
             """
-            INSERT INTO messages (sender_id, receiver_id, message, file_url, type, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO messages (
+                sender_id, receiver_id, message, file_url, type, timestamp,
+                status, delivered_at, seen_at, conversation_key
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (sender["id"], receiver["id"], message, file_url, message_type, timestamp),
+            (
+                sender["id"],
+                receiver["id"],
+                message,
+                file_url,
+                message_type,
+                timestamp,
+                status,
+                delivered_at,
+                None,
+                conversation_key,
+            ),
         )
         connection.commit()
 
@@ -374,8 +631,27 @@ def _create_message_payload(
         file_url=file_url,
         message_type=message_type,
         timestamp=timestamp,
+        status=status,
+        delivered_at=delivered_at,
+        seen_at=None,
+        conversation_key=conversation_key,
     )
     _broadcast_message(db_path, payload)
+    if status != "sent":
+        _emit_message_status(
+            db_path,
+            _build_status_payload(
+                message_id=cursor.lastrowid,
+                sender_id=sender_source_id,
+                sender_role=authenticated_role,
+                receiver_id=receiver_source_id,
+                receiver_role=receiver_role,
+                status=status,
+                delivered_at=delivered_at,
+                seen_at=None,
+                conversation_key=conversation_key,
+            ),
+        )
     return payload
 
 
@@ -391,7 +667,10 @@ def register_chat_socketio(socketio, load_users_func, save_users_func=None, db_p
     def handle_connect():
         user_id = session.get("user_id")
         if user_id:
-            join_room(get_socket_room(int(user_id)))
+            join_default_socket_rooms(join_room, int(user_id), session.get("user_type"))
+            _track_active_socket(resolved_db_path, int(user_id), session.get("user_type"), request.sid)
+            for status_payload in _mark_messages_delivered(resolved_db_path, int(user_id), session.get("user_type")):
+                _emit_message_status(resolved_db_path, status_payload)
 
     @socketio.on("register_user")
     def handle_register_user(data):
@@ -405,8 +684,16 @@ def register_chat_socketio(socketio, load_users_func, save_users_func=None, db_p
         if requested_user_id is not None and requested_user_id != int(user_id):
             return {"error": "User registration mismatch."}
 
-        join_room(get_socket_room(int(user_id)))
+        join_default_socket_rooms(join_room, int(user_id), session.get("user_type"))
+        _track_active_socket(resolved_db_path, int(user_id), session.get("user_type"), request.sid)
+        delivered_payloads = _mark_messages_delivered(resolved_db_path, int(user_id), session.get("user_type"))
+        for status_payload in delivered_payloads:
+            _emit_message_status(resolved_db_path, status_payload)
         return {"success": True, "user_id": int(user_id)}
+
+    @socketio.on("disconnect")
+    def handle_disconnect():
+        _remove_active_socket(resolved_db_path, request.sid)
 
     @socketio.on("send_message")
     def handle_socket_message(data):
@@ -465,7 +752,7 @@ def create_chat_blueprint(
             users_payload = load_users_func()
             allowed_counterpart_ids = get_allowed_chat_user_ids(users_payload, current_role, current_source_id)
 
-            with _get_connection_with_rows(resolved_db_path) as connection:
+            with closing(_get_connection_with_rows(resolved_db_path)) as connection:
                 current_user = _get_chat_user(connection, current_source_id, current_role)
                 if current_user is None:
                     return jsonify({"error": "Authenticated user not found in chat directory."}), 404
@@ -480,7 +767,14 @@ def create_chat_blueprint(
                         users.email,
                         users.created_at,
                         MAX(messages.timestamp) AS last_message_at,
-                        COUNT(messages.id) AS message_count
+                        COUNT(messages.id) AS message_count,
+                        SUM(
+                            CASE
+                                WHEN messages.receiver_id = ? AND COALESCE(messages.status, 'sent') != 'seen'
+                                THEN 1
+                                ELSE 0
+                            END
+                        ) AS unread_count
                     FROM users
                     LEFT JOIN messages
                         ON (
@@ -491,7 +785,7 @@ def create_chat_blueprint(
                     GROUP BY users.id, users.source_id, users.role, users.username, users.full_name, users.email, users.created_at
                     ORDER BY COALESCE(MAX(messages.timestamp), users.created_at) DESC, users.full_name ASC
                     """,
-                    (current_user["id"], current_user["id"], counterpart_role),
+                    (current_user["id"], current_user["id"], current_user["id"], counterpart_role),
                 ).fetchall()
 
             chat_users = [
@@ -504,6 +798,7 @@ def create_chat_blueprint(
                     "created_at": row["created_at"],
                     "last_message_at": row["last_message_at"],
                     "message_count": row["message_count"],
+                    "unread_count": row["unread_count"] or 0,
                 }
                 for row in rows
                 if allowed_counterpart_ids is None or row["source_id"] in allowed_counterpart_ids
@@ -626,7 +921,7 @@ def create_chat_blueprint(
             if limit is not None:
                 limit = max(1, min(limit, 500))
 
-            with _get_connection_with_rows(resolved_db_path) as connection:
+            with closing(_get_connection_with_rows(resolved_db_path)) as connection:
                 current_user = _get_chat_user(connection, current_source_id, current_role)
                 if current_user is None:
                     return jsonify({"error": "Authenticated user not found in chat directory."}), 404
@@ -638,6 +933,10 @@ def create_chat_blueprint(
                         messages.file_url,
                         messages.type,
                         messages.timestamp,
+                        messages.status,
+                        messages.delivered_at,
+                        messages.seen_at,
+                        messages.conversation_key,
                         sender.source_id AS sender_source_id,
                         sender.role AS sender_role,
                         sender.full_name AS sender_name,
@@ -665,6 +964,14 @@ def create_chat_blueprint(
                     if counterpart_user is None:
                         return jsonify({"error": "Conversation user not found."}), 404
                     ensure_patient_doctor_roles(current_user["role"], counterpart_user["role"])
+                    for status_payload in _mark_conversation_seen(
+                        resolved_db_path,
+                        current_source_id=current_source_id,
+                        current_role=current_role,
+                        counterpart_source_id=counterpart_source_id,
+                        counterpart_role=counterpart_role,
+                    ):
+                        _emit_message_status(resolved_db_path, status_payload)
 
                     query += """
                         AND (

@@ -93,8 +93,8 @@ def preprocess_classifier_image(
 ) -> np.ndarray:
     """Prepare a 3-channel image for classification models."""
     image = ensure_three_channel(image)
-    resized = cv2.resize(image, target_size, interpolation=cv2.INTER_AREA)
-    normalized = resized.astype(np.float32) / 255.0
+    resized = cv2.resize(image, target_size, interpolation=cv2.INTER_CUBIC)
+    normalized = np.clip(resized.astype(np.float32) / 255.0, 0.0, 1.0)
     return np.expand_dims(normalized, axis=0)
 
 
@@ -105,8 +105,8 @@ def preprocess_segmentation_image(
     """Prepare a grayscale image for U-Net style segmentation models."""
     image = ensure_three_channel(image)
     grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    resized = cv2.resize(grayscale, target_size, interpolation=cv2.INTER_AREA)
-    normalized = resized.astype(np.float32) / 255.0
+    resized = cv2.resize(grayscale, target_size, interpolation=cv2.INTER_CUBIC)
+    normalized = np.clip(resized.astype(np.float32) / 255.0, 0.0, 1.0)
     return np.expand_dims(normalized[..., np.newaxis], axis=0)
 
 
